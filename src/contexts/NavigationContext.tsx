@@ -18,10 +18,46 @@ interface NavigationProviderProps {
   children: ReactNode;
 }
 
+const USER_STORAGE_KEY = 'atom-lionscl:user';
+const MOBILE_STORAGE_KEY = 'atom-lionscl:mobile-number';
+const NAV_DATA_STORAGE_KEY = 'atom-lionscl:navigation-data';
+
+const canUseBrowserStorage = (): boolean => {
+  try {
+    return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+  } catch {
+    return false;
+  }
+};
+
+const loadFromStorage = <T,>(key: string, fallback: T): T => {
+  if (!canUseBrowserStorage()) return fallback;
+  try {
+    const storedValue = window.localStorage.getItem(key);
+    if (storedValue === null) return fallback;
+    return JSON.parse(storedValue) as T;
+  } catch {
+    return fallback;
+  }
+};
+
+const saveToStorage = (key: string, value: unknown): void => {
+  if (!canUseBrowserStorage()) return;
+  try {
+    if (value === null || value === undefined) {
+      window.localStorage.removeItem(key);
+      return;
+    }
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Ignore storage errors (e.g., private browsing or quota exceeded)
+  }
+};
+
 export const NavigationProvider: React.FC<NavigationProviderProps> = ({ children }) => {
-  const [user, setUser] = useState<any>(null);
-  const [mobileNumber, setMobileNumber] = useState<string>('');
-  const [navigationData, setNavigationData] = useState<any>(null);
+  const [user, setUserState] = useState<any>(() => loadFromStorage(USER_STORAGE_KEY, null));
+  const [mobileNumber, setMobileNumberState] = useState<string>(() => loadFromStorage(MOBILE_STORAGE_KEY, ''));
+  const [navigationData, setNavigationDataState] = useState<any>(() => loadFromStorage(NAV_DATA_STORAGE_KEY, null));
   const router = CustomRouter.getInstance();
   const [currentRoute, setCurrentRoute] = useState<Route>(router.getCurrentRoute());
 
@@ -36,6 +72,26 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({ children
     return unsubscribe;
   }, []);
 
+  useEffect(() => {
+    saveToStorage(USER_STORAGE_KEY, user);
+  }, [user]);
+
+  useEffect(() => {
+    saveToStorage(MOBILE_STORAGE_KEY, mobileNumber || null);
+  }, [mobileNumber]);
+
+  useEffect(() => {
+    saveToStorage(NAV_DATA_STORAGE_KEY, navigationData);
+  }, [navigationData]);
+
+  const setUser = (value: any) => {
+    setUserState(value);
+  };
+
+  const setMobileNumber = (value: string) => {
+    setMobileNumberState(value);
+  };
+
   const navigateTo = (path: string, data?: any) => {
     // Convert path to route
     const route = path.startsWith('/') ? path.slice(1) : path;
@@ -43,14 +99,14 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({ children
     
     // Store navigation data if provided
     if (data) {
-      setNavigationData(data);
+      setNavigationDataState(data);
     }
     
     router.navigate(validRoute);
   };
 
   const clearNavigationData = () => {
-    setNavigationData(null);
+    setNavigationDataState(null);
   };
 
   const value: NavigationContextType = {

@@ -49,11 +49,7 @@ const RoutineMaintenancePage: React.FC = () => {
     'Next 15 days',
     'Next 30 days',
     'Next 45 days',
-    'Last 3 days',
-    'Last 7 days',
-    'Last 15 days',
-    'Last 30 days',
-    'Last 45 days'
+    
   ];
 
   // Load maintenance items on component mount
@@ -239,7 +235,7 @@ const RoutineMaintenancePage: React.FC = () => {
           </TouchableOpacity>
           <TouchableOpacity style={styles.searchButton} onPress={handleSearchToggle}>
             <Image 
-              source={require('../assets/search (2).png')} 
+              source={require('../assets/search.png')} 
               style={styles.searchIcon}
               resizeMode="contain"
             />

@@ -175,7 +175,7 @@ const ComplaintsPage: React.FC = () => {
           
           <TouchableOpacity style={styles.searchButton} onPress={handleSearch}>
             <Image 
-              source={require('../assets/search (2).png')} 
+              source={require('../assets/search.png')} 
               style={styles.searchIcon}
               resizeMode="contain"
             />
@@ -208,7 +208,7 @@ const ComplaintsPage: React.FC = () => {
         
         <TouchableOpacity style={styles.searchButton} onPress={handleSearch}>
           <Image 
-            source={require('../assets/search (2).png')} 
+            source={require('../assets/search.png')} 
             style={styles.searchIcon}
             resizeMode="contain"
           />

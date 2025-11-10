@@ -8,6 +8,8 @@ import {
   TouchableOpacity,
   ScrollView,
   Modal,
+  Image,
+  ImageSourcePropType,
 } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
@@ -16,7 +18,7 @@ const isWeb = Platform.OS === 'web';
 interface MenuItem {
   id: string;
   title: string;
-  icon: string;
+  icon: ImageSourcePropType;
   onPress: () => void;
 }
 
@@ -47,11 +49,24 @@ const SideMenu: React.FC<SideMenuProps> = ({
   onNavigateToQuotation,
   onNavigateToProfileSwitch,
 }) => {
+  const menuIcons: Record<string, ImageSourcePropType> = {
+    bookComplaint: require('../assets/Book a complaint.png'),
+    preventiveServices: require('../assets/Preventive services.png'),
+    complaints: require('../assets/Complaint.png'),
+    contracts: require('../assets/Contracts.png'),
+    quotation: require('../assets/Quatation.png'),
+    invoice: require('../assets/invoice.png'),
+    aboutUs: require('../assets/About us.png'),
+    switchProfile: require('../assets/Switch profile.png'),
+    logout: require('../assets/logout.png'),
+  };
+  const telephoneIcon = require('../assets/telephone.png');
+
   const menuItems: MenuItem[] = [
     {
       id: 'book-complaint',
       title: 'Book a Complaint',
-      icon: '📞',
+      icon: menuIcons.bookComplaint,
       onPress: () => {
         onClose();
         if (onNavigateToAddComplaint) {
@@ -62,7 +77,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
     {
       id: 'preventive-services',
       title: 'Preventive Services',
-      icon: '🔄',
+      icon: menuIcons.preventiveServices,
       onPress: () => {
         onClose();
         if (onNavigateToRoutineMaintenance) {
@@ -73,7 +88,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
     {
       id: 'complaints',
       title: 'Complaints',
-      icon: '⏰',
+      icon: menuIcons.complaints,
       onPress: () => {
         onClose();
         if (onNavigateToComplaints) {
@@ -84,7 +99,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
     {
       id: 'contracts',
       title: 'Contracts',
-      icon: '📄',
+      icon: menuIcons.contracts,
       onPress: () => {
         onClose();
         if (onNavigateToAMCContracts) {
@@ -95,7 +110,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
     {
       id: 'quotation',
       title: 'Quotation',
-      icon: '📋',
+      icon: menuIcons.quotation,
       onPress: () => {
         if (onNavigateToQuotation) {
           onNavigateToQuotation();
@@ -106,7 +121,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
     {
       id: 'invoice',
       title: 'Invoice',
-      icon: '🧾',
+      icon: menuIcons.invoice,
       onPress: () => {
         if (onNavigateToInvoice) {
           onNavigateToInvoice();
@@ -117,7 +132,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
     {
       id: 'about-us',
       title: 'About Us',
-      icon: '🏢',
+      icon: menuIcons.aboutUs,
       onPress: () => {
         console.log('About Us pressed');
         onClose();
@@ -126,7 +141,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
     {
       id: 'switch-profile',
       title: 'Switch Profile',
-      icon: '🔄',
+      icon: menuIcons.switchProfile,
       onPress: () => {
         if (onNavigateToProfileSwitch) {
           onNavigateToProfileSwitch();
@@ -137,7 +152,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
     {
       id: 'logout',
       title: 'Logout',
-      icon: '🚪',
+      icon: menuIcons.logout,
       onPress: () => {
         onClose();
         if (onLogout) {
@@ -162,12 +177,6 @@ const SideMenu: React.FC<SideMenuProps> = ({
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
-        <TouchableOpacity
-          style={styles.backdrop}
-          activeOpacity={1}
-          onPress={onClose}
-        />
-        
         <View style={styles.menuContainer}>
           {/* Blue Header with Geometric Pattern */}
           <View style={styles.header}>
@@ -184,7 +193,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
               </View>
               
               <View style={styles.userItem}>
-                <Text style={styles.userIcon}>📱</Text>
+                <Image source={telephoneIcon} style={styles.userIconImage} resizeMode="contain" />
                 <Text style={styles.userText}>
                   {formatMobileNumber(userData?.mobileNumber || '8072951720')}
                 </Text>
@@ -201,7 +210,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
                 onPress={item.onPress}
               >
                 <View style={styles.menuItemIcon}>
-                  <Text style={styles.menuIcon}>{item.icon}</Text>
+                  <Image source={item.icon} style={styles.menuIcon} resizeMode="contain" />
                 </View>
                 <Text style={styles.menuItemText}>{item.title}</Text>
               </TouchableOpacity>
@@ -217,6 +226,12 @@ const SideMenu: React.FC<SideMenuProps> = ({
             </TouchableOpacity>
           </View>
         </View>
+
+        <TouchableOpacity
+          style={styles.backdrop}
+          activeOpacity={1}
+          onPress={onClose}
+        />
       </View>
     </Modal>
   );
@@ -290,6 +305,11 @@ const styles = StyleSheet.create({
     fontSize: 20,
     marginRight: 15,
   },
+  userIconImage: {
+    width: 20,
+    height: 20,
+    marginRight: 15,
+  },
   userText: {
     color: '#FFFFFF',
     fontSize: 16,
@@ -317,7 +337,8 @@ const styles = StyleSheet.create({
     marginRight: 15,
   },
   menuIcon: {
-    fontSize: 20,
+    width: 24,
+    height: 24,
   },
   menuItemText: {
     fontSize: 16,
