@@ -46,7 +46,7 @@ const LoginPage: React.FC = () => {
     <View style={[styles.container, isWeb && styles.webContainer]}>
       {/* Logo Section */}
       <View style={styles.logoContainer}>
-        <Text style={styles.logo}>LIONSCL</Text>
+        <Text style={styles.logo}>ATOM USER APP</Text>
       </View>
 
       {/* Login Form */}
@@ -95,9 +95,9 @@ const LoginPage: React.FC = () => {
         </TouchableOpacity>
 
         {/* Register Link */}
-        <TouchableOpacity style={styles.registerLink} onPress={handleRegister}>
+        {/* <TouchableOpacity style={styles.registerLink} onPress={handleRegister}>
           <Text style={styles.linkText}>Register your business with Lionsol</Text>
-        </TouchableOpacity>
+        </TouchableOpacity> */}
       </View>
 
       {/* Footer */}

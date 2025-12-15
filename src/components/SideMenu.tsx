@@ -218,13 +218,13 @@ const SideMenu: React.FC<SideMenuProps> = ({
           </ScrollView>
 
           {/* Footer */}
-          <View style={styles.footer}>
+          {/* <View style={styles.footer}>
             <Text style={styles.footerText}>Designed & Developed By</Text>
             <Text style={styles.footerCompany}>Lionsol Infoway Pvt. Ltd.</Text>
             <TouchableOpacity>
               <Text style={styles.footerLink}>https://lionsol.in</Text>
             </TouchableOpacity>
-          </View>
+          </View> */}
         </View>
 
         <TouchableOpacity
