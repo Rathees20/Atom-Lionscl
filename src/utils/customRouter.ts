@@ -2,7 +2,6 @@
 export type Route = 
   | 'login' 
   | 'register' 
-  | 'otp' 
   | 'dashboard' 
   | 'add-complaint' 
   | 'complaints'
@@ -12,7 +11,8 @@ export type Route =
   | 'amc-contracts'
   | 'invoice'
   | 'quotation'
-  | 'profile-switch';
+  | 'profile-switch'
+  | 'about-us';
 
 const ROUTE_STORAGE_KEY = 'atom-lionscl:current-route';
 
@@ -20,7 +20,6 @@ const isValidRoute = (value: string): value is Route => {
   return [
     'login',
     'register',
-    'otp',
     'dashboard',
     'add-complaint',
     'complaints',
@@ -31,6 +30,7 @@ const isValidRoute = (value: string): value is Route => {
     'invoice',
     'quotation',
     'profile-switch',
+    'about-us',
   ].includes(value);
 };
 
@@ -52,6 +52,9 @@ export class CustomRouter {
     const persistedRoute = this.loadPersistedRoute();
     if (persistedRoute) {
       this.currentRoute = persistedRoute;
+    } else {
+      // Only default to login if no persisted route exists
+      this.currentRoute = 'login';
     }
   }
 

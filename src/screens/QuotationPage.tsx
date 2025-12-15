@@ -74,7 +74,7 @@ const QuotationPage: React.FC = () => {
   if (isLoading) {
     return (
       <View style={styles.container}>
-        <StatusBar barStyle="light-content" backgroundColor="#0066CC" />
+        <StatusBar barStyle="light-content" backgroundColor="#4CAF50" />
         
         {/* Header */}
         <View style={styles.header}>
@@ -101,7 +101,7 @@ const QuotationPage: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#0066CC" />
+      <StatusBar barStyle="light-content" backgroundColor="#4CAF50" />
       
       {/* Header */}
       <View style={styles.header}>
@@ -154,7 +154,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5',
   },
   header: {
-    backgroundColor: '#0066CC',
+    backgroundColor: '#4CAF50',
     paddingTop: Platform.OS === 'ios' ? 50 : 30,
     paddingBottom: 15,
     paddingHorizontal: 20,

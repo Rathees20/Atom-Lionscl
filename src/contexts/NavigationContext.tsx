@@ -21,6 +21,7 @@ interface NavigationProviderProps {
 const USER_STORAGE_KEY = 'atom-lionscl:user';
 const MOBILE_STORAGE_KEY = 'atom-lionscl:mobile-number';
 const NAV_DATA_STORAGE_KEY = 'atom-lionscl:navigation-data';
+const ROUTE_STORAGE_KEY = 'atom-lionscl:current-route';
 
 const canUseBrowserStorage = (): boolean => {
   try {
@@ -65,12 +66,28 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({ children
     // Initialize router and subscribe to route changes
     router.initialize();
     
+    // If user exists but route is login, navigate to dashboard
+    // This handles the case where user refreshes and route defaults to login
+    if (user && router.getCurrentRoute() === 'login') {
+      router.navigate('dashboard');
+    }
+    
     const unsubscribe = router.subscribe((route: Route) => {
       setCurrentRoute(route);
     });
 
     return unsubscribe;
   }, []);
+  
+  // Separate effect to handle user state changes
+  useEffect(() => {
+    // If user is logged in and on login page, redirect to dashboard
+    if (user && router.getCurrentRoute() === 'login') {
+      router.navigate('dashboard');
+    }
+    // If user is logged out and not on login/register, stay on current page
+    // (Only redirect on explicit logout, which is handled in setUser)
+  }, [user]);
 
   useEffect(() => {
     saveToStorage(USER_STORAGE_KEY, user);
@@ -86,6 +103,19 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({ children
 
   const setUser = (value: any) => {
     setUserState(value);
+    // If user is being cleared (logout), also clear the route and navigate to login
+    if (value === null || value === undefined) {
+      // Clear persisted route on logout
+      if (canUseBrowserStorage()) {
+        try {
+          window.localStorage.removeItem(ROUTE_STORAGE_KEY);
+        } catch {
+          // Ignore storage errors
+        }
+      }
+      // Navigate to login on logout
+      router.navigate('login');
+    }
   };
 
   const setMobileNumber = (value: string) => {

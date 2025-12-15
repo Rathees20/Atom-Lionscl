@@ -47,7 +47,7 @@ const RegisterPage: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#0066CC" />
+      <StatusBar barStyle="light-content" backgroundColor="#4CAF50" />
       
       {/* Blue Header Section */}
       <View style={styles.header}>
@@ -108,7 +108,7 @@ const RegisterPage: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0066CC',
+    backgroundColor: '#4CAF50',
   },
   header: {
     paddingTop: Platform.OS === 'ios' ? 50 : 30,

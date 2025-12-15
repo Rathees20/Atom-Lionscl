@@ -106,7 +106,7 @@ const MaintenanceDetailsPage: React.FC<MaintenanceDetailsPageProps> = ({ mainten
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#0066CC" />
+      <StatusBar barStyle="light-content" backgroundColor="#4CAF50" />
       
       {/* Header */}
       <View style={styles.header}>
@@ -261,7 +261,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5',
   },
   header: {
-    backgroundColor: '#0066CC',
+    backgroundColor: '#4CAF50',
     paddingTop: Platform.OS === 'ios' ? 50 : 30,
     paddingBottom: 15,
     paddingHorizontal: 20,
@@ -374,7 +374,7 @@ const styles = StyleSheet.create({
   },
   addressText: {
     fontSize: 14,
-    color: '#0066CC',
+    color: '#4CAF50',
     flex: 1,
   },
   externalLinkIcon: {

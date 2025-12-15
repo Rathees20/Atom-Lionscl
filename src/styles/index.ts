@@ -137,7 +137,7 @@ export const loginStyles = StyleSheet.create({
     marginBottom: 40,
   },
   linkText: {
-    color: '#0066CC',
+    color: '#4CAF50',
     fontSize: 14,
     textDecorationLine: 'underline',
   },
@@ -155,7 +155,7 @@ export const loginStyles = StyleSheet.create({
     marginTop: 8,
   },
   websiteText: {
-    color: '#0066CC',
+    color: '#4CAF50',
     fontSize: 12,
     textDecorationLine: 'underline',
   },
@@ -167,7 +167,7 @@ export const loginStyles = StyleSheet.create({
 export const registerStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0066CC',
+    backgroundColor: '#4CAF50',
   },
   header: {
     paddingTop: Platform.OS === 'ios' ? 50 : 30,
@@ -263,7 +263,7 @@ export const registerStyles = StyleSheet.create({
 export const otpStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0066CC',
+    backgroundColor: '#4CAF50',
   },
   header: {
     paddingTop: Platform.OS === 'ios' ? 50 : 30,
@@ -333,11 +333,11 @@ export const otpStyles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   otpInputFilled: {
-    borderColor: '#0066CC',
+    borderColor: '#4CAF50',
     backgroundColor: '#F0F8FF',
   },
   verifyButton: {
-    backgroundColor: '#0066CC',
+    backgroundColor: '#4CAF50',
     paddingVertical: 16,
     paddingHorizontal: 32,
     borderRadius: 12,
@@ -372,7 +372,7 @@ export const otpStyles = StyleSheet.create({
   },
   resendLink: {
     fontSize: 14,
-    color: '#0066CC',
+    color: '#4CAF50',
     fontWeight: '600',
     textDecorationLine: 'underline',
   },
@@ -391,7 +391,7 @@ export const dashboardStyles = StyleSheet.create({
     backgroundColor: '#F5F5F5',
   },
   header: {
-    backgroundColor: '#0066CC',
+    backgroundColor: '#4CAF50',
     paddingTop: Platform.OS === 'ios' ? 50 : 30,
     paddingBottom: 15,
     paddingHorizontal: 20,
@@ -563,7 +563,7 @@ export const sideMenuStyles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   header: {
-    backgroundColor: '#0066CC',
+    backgroundColor: '#4CAF50',
     paddingTop: Platform.OS === 'ios' ? 50 : 30,
     paddingBottom: 30,
     paddingHorizontal: 20,
@@ -664,13 +664,13 @@ export const sideMenuStyles = StyleSheet.create({
   },
   footerCompany: {
     fontSize: 12,
-    color: '#0066CC',
+    color: '#4CAF50',
     fontWeight: '600',
     marginBottom: 5,
   },
   footerLink: {
     fontSize: 12,
-    color: '#0066CC',
+    color: '#4CAF50',
     textDecorationLine: 'underline',
   },
 });
@@ -680,7 +680,7 @@ export const sideMenuStyles = StyleSheet.create({
 // ============================================================================
 export const commonStyles = StyleSheet.create({
   // Colors
-  primaryBlue: '#0066CC',
+  primaryGreen: '#4CAF50',
   secondaryBlue: '#8B5CF6',
   orange: '#FF6B35',
   red: '#FF4444',

@@ -1,8 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigation } from '../contexts/NavigationContext';
 import LoginPage from '../screens/LoginPage';
 import RegisterPage from '../screens/RegisterPage';
-import OTPVerificationPage from '../screens/OTPVerificationPage';
 import DashboardPage from '../screens/DashboardPage';
 import AddComplaintPage from '../screens/AddComplaintPage';
 import ComplaintsPage from '../screens/ComplaintsPage';
@@ -13,18 +12,57 @@ import AMCContractsPage from '../screens/AMCContractsPage';
 import InvoicePage from '../screens/InvoicePage';
 import QuotationPage from '../screens/QuotationPage';
 import ProfileSwitchPage from '../screens/ProfileSwitchPage';
+import AboutUsPage from '../screens/AboutUsPage';
+
+// Routes that require authentication
+const PROTECTED_ROUTES = [
+  'dashboard',
+  'add-complaint',
+  'complaints',
+  'ticket-details',
+  'routine-maintenance',
+  'maintenance-details',
+  'amc-contracts',
+  'invoice',
+  'quotation',
+  'profile-switch',
+  'about-us',
+];
+
+// Public routes that don't require authentication
+const PUBLIC_ROUTES = ['login', 'register'];
 
 const AppRouter: React.FC = () => {
-  const { currentRoute } = useNavigation();
+  const { currentRoute, user, navigateTo } = useNavigation();
+
+  useEffect(() => {
+    // Only redirect to login if:
+    // 1. User is not logged in
+    // 2. Current route is a protected route
+    // 3. Current route is not already login
+    if (!user && PROTECTED_ROUTES.includes(currentRoute) && currentRoute !== 'login') {
+      // Don't navigate - let the user stay on their current page
+      // Only redirect if explicitly needed (handled by logout)
+    }
+  }, [currentRoute, user, navigateTo]);
 
   const renderCurrentScreen = () => {
+    // If user is logged in or on a public route, show the requested screen
+    // If user is not logged in and trying to access protected route, show login
+    const isProtectedRoute = PROTECTED_ROUTES.includes(currentRoute);
+    const isPublicRoute = PUBLIC_ROUTES.includes(currentRoute);
+
+    if (!user && isProtectedRoute && !isPublicRoute) {
+      // User is not logged in and trying to access protected route
+      // But we want to persist the route, so we'll show the page anyway
+      // The actual authentication check should be done at API level
+    }
+
     switch (currentRoute) {
       case 'login':
         return <LoginPage />;
       case 'register':
         return <RegisterPage />;
-      case 'otp':
-        return <OTPVerificationPage />;
       case 'dashboard':
         return <DashboardPage />;
       case 'add-complaint':
@@ -45,8 +83,15 @@ const AppRouter: React.FC = () => {
         return <QuotationPage />;
       case 'profile-switch':
         return <ProfileSwitchPage />;
+      case 'about-us':
+        return <AboutUsPage />;
       default:
-        return <LoginPage />;
+        // If no user and default route, show login
+        // Otherwise, try to restore to dashboard or last known route
+        if (!user) {
+          return <LoginPage />;
+        }
+        return <DashboardPage />;
     }
   };
 

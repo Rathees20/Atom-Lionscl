@@ -34,7 +34,7 @@ const DashboardPage: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#0066CC" />
+      <StatusBar barStyle="light-content" backgroundColor="#4CAF50" />
       
       {/* Side Menu */}
       <SideMenu
@@ -52,6 +52,7 @@ const DashboardPage: React.FC = () => {
         onNavigateToInvoice={() => navigateTo('/invoice')}
         onNavigateToQuotation={() => navigateTo('/quotation')}
         onNavigateToProfileSwitch={() => navigateTo('/profile-switch')}
+        onNavigateToAboutUs={() => navigateTo('/about-us')}
       />
       
       {/* Blue Header */}
@@ -206,7 +207,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5',
   },
   header: {
-    backgroundColor: '#0066CC',
+    backgroundColor: '#4CAF50',
     paddingTop: Platform.OS === 'ios' ? 50 : 30,
     paddingBottom: 15,
     paddingHorizontal: 20,

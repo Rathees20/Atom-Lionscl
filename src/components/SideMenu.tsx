@@ -34,6 +34,7 @@ interface SideMenuProps {
   onNavigateToInvoice?: () => void;
   onNavigateToQuotation?: () => void;
   onNavigateToProfileSwitch?: () => void;
+  onNavigateToAboutUs?: () => void;
 }
 
 const SideMenu: React.FC<SideMenuProps> = ({
@@ -48,6 +49,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
   onNavigateToInvoice,
   onNavigateToQuotation,
   onNavigateToProfileSwitch,
+  onNavigateToAboutUs,
 }) => {
   const menuIcons: Record<string, ImageSourcePropType> = {
     bookComplaint: require('../assets/Book a complaint.png'),
@@ -134,8 +136,10 @@ const SideMenu: React.FC<SideMenuProps> = ({
       title: 'About Us',
       icon: menuIcons.aboutUs,
       onPress: () => {
-        console.log('About Us pressed');
         onClose();
+        if (onNavigateToAboutUs) {
+          onNavigateToAboutUs();
+        }
       },
     },
     {
@@ -252,7 +256,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   header: {
-    backgroundColor: '#0066CC',
+    backgroundColor: '#4CAF50',
     paddingTop: Platform.OS === 'ios' ? 50 : 30,
     paddingBottom: 30,
     paddingHorizontal: 20,
@@ -359,13 +363,13 @@ const styles = StyleSheet.create({
   },
   footerCompany: {
     fontSize: 12,
-    color: '#0066CC',
+    color: '#4CAF50',
     fontWeight: '600',
     marginBottom: 5,
   },
   footerLink: {
     fontSize: 12,
-    color: '#0066CC',
+    color: '#4CAF50',
     textDecorationLine: 'underline',
   },
 });

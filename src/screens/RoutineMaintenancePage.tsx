@@ -215,7 +215,7 @@ const RoutineMaintenancePage: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#0066CC" />
+      <StatusBar barStyle="light-content" backgroundColor="#4CAF50" />
       
       {/* Blue Header */}
       <View style={styles.header}>
@@ -432,7 +432,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5',
   },
   header: {
-    backgroundColor: '#0066CC',
+    backgroundColor: '#4CAF50',
     paddingTop: Platform.OS === 'ios' ? 50 : 30,
     paddingBottom: 15,
     paddingHorizontal: 20,
@@ -567,7 +567,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 20,
     right: 20,
-    backgroundColor: '#0066CC',
+    backgroundColor: '#4CAF50',
     borderRadius: 25,
     paddingVertical: 12,
     paddingHorizontal: 16,
@@ -639,7 +639,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#0066CC',
+    color: '#4CAF50',
     marginBottom: 8,
   },
   modalSubtitle: {
@@ -710,11 +710,11 @@ const styles = StyleSheet.create({
     color: '#333333',
   },
   dropdownOptionTextSelected: {
-    color: '#0066CC',
+    color: '#4CAF50',
     fontWeight: '600',
   },
   filterSearchButton: {
-    backgroundColor: '#0066CC',
+    backgroundColor: '#4CAF50',
     borderRadius: 8,
     paddingVertical: 15,
     alignItems: 'center',
