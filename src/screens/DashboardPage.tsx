@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,16 +8,92 @@ import {
   TouchableOpacity,
   ScrollView,
   StatusBar,
+  Alert,
 } from 'react-native';
 import SideMenu from '../components/SideMenu';
 import { useNavigation } from '../contexts/NavigationContext';
+import { API_ENDPOINTS } from '../utils/api';
 
 const { width, height } = Dimensions.get('window');
 const isWeb = Platform.OS === 'web';
 
+interface AMCSummary {
+  totalContracts: number;
+  activeContracts: number;
+  totalAmount: number;
+  paidAmount: number;
+  dueAmount: number;
+  latestContract?: {
+    contractId: string;
+    status: string;
+    period: string;
+  };
+}
+
 const DashboardPage: React.FC = () => {
   const { user, setUser, navigateTo } = useNavigation();
   const [isMenuVisible, setIsMenuVisible] = useState(false);
+  const [amcSummary, setAmcSummary] = useState<AMCSummary | null>(null);
+  const [isLoadingAMC, setIsLoadingAMC] = useState(true);
+
+  useEffect(() => {
+    loadAMCData();
+  }, []);
+
+  const loadAMCData = async () => {
+    try {
+      setIsLoadingAMC(true);
+      
+      const userEmail = user?.email;
+      if (!userEmail) {
+        setIsLoadingAMC(false);
+        return;
+      }
+      
+      const url = `${API_ENDPOINTS.CUSTOMER_AMCS}?email=${encodeURIComponent(userEmail)}`;
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        const amcs = Array.isArray(data) ? data : (data.amcs || data.contracts || data.results || []);
+        
+        const summary: AMCSummary = {
+          totalContracts: amcs.length,
+          activeContracts: amcs.filter((item: any) => 
+            (item.status || '').toLowerCase() === 'active'
+          ).length,
+          totalAmount: amcs.reduce((sum: number, item: any) => 
+            sum + (parseFloat(item.contract_amount || item.contractAmount || '0') || 0), 0
+          ),
+          paidAmount: amcs.reduce((sum: number, item: any) => 
+            sum + (parseFloat(item.paid_amount || item.paidAmount || '0') || 0), 0
+          ),
+          dueAmount: amcs.reduce((sum: number, item: any) => 
+            sum + (parseFloat(item.due_amount || item.dueAmount || '0') || 0), 0
+          ),
+          latestContract: amcs.length > 0 ? {
+            contractId: amcs[0].contract_id || amcs[0].contractId || amcs[0].amc_id?.toString() || 'N/A',
+            status: amcs[0].status || 'N/A',
+            period: amcs[0].period || amcs[0].contract_period || 
+              (amcs[0].start_date && amcs[0].end_date ? `${amcs[0].start_date} - ${amcs[0].end_date}` : 'N/A'),
+          } : undefined,
+        };
+        
+        setAmcSummary(summary);
+      }
+    } catch (error) {
+      console.error('Error loading AMC data:', error);
+    } finally {
+      setIsLoadingAMC(false);
+    }
+  };
 
   const handleMenuPress = () => {
     setIsMenuVisible(true);
@@ -76,47 +152,180 @@ const DashboardPage: React.FC = () => {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>CLIENT INFORMATION</Text>
           
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Installation ID :</Text>
-            <Text style={styles.infoValue}>AL9876</Text>
-          </View>
+          {user?.reference_id && (
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Reference ID :</Text>
+              <Text style={styles.infoValue}>{user.reference_id}</Text>
+            </View>
+          )}
           
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Maintenance ID :</Text>
-            <Text style={styles.infoValue}>988888</Text>
-          </View>
+          {user?.job_no && (
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Job No :</Text>
+              <Text style={styles.infoValue}>{user.job_no}</Text>
+            </View>
+          )}
           
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Site Name :</Text>
-            <Text style={styles.infoValue}>Test Site 1</Text>
-          </View>
+          {user?.site_name && (
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Site Name :</Text>
+              <Text style={styles.infoValue}>{user.site_name}</Text>
+            </View>
+          )}
           
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Address :</Text>
-            <Text style={styles.infoValue}>No 27 t h road kaladipet</Text>
-          </View>
+          {user?.site_address && (
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Address :</Text>
+              <Text style={styles.infoValue}>{user.site_address}</Text>
+            </View>
+          )}
           
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>City :</Text>
-            <Text style={styles.infoValue}>Chennai State : Tamil Nadu</Text>
-          </View>
+          {(user?.city_name || user?.province_state_name) && (
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Location :</Text>
+              <Text style={styles.infoValue}>
+                {[user.city_name, user.province_state_name].filter(Boolean).join(', ')}
+              </Text>
+            </View>
+          )}
           
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Pin :</Text>
-            <Text style={styles.infoValue}>600001</Text>
-          </View>
+          {user?.pin_code && (
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Pin Code :</Text>
+              <Text style={styles.infoValue}>{user.pin_code}</Text>
+            </View>
+          )}
+          
+          {user?.phone && (
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Phone :</Text>
+              <Text style={styles.infoValue}>{user.phone}</Text>
+            </View>
+          )}
+          
+          {user?.mobile && (
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Mobile :</Text>
+              <Text style={styles.infoValue}>{user.mobile}</Text>
+            </View>
+          )}
+          
+          {user?.email && (
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Email :</Text>
+              <Text style={styles.infoValue}>{user.email}</Text>
+            </View>
+          )}
+          
+          {user?.contact_person_name && (
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Contact Person :</Text>
+              <Text style={styles.infoValue}>{user.contact_person_name}</Text>
+            </View>
+          )}
+          
+          {user?.branch_name && (
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Branch :</Text>
+              <Text style={styles.infoValue}>{user.branch_name}</Text>
+            </View>
+          )}
+          
+          {user?.route_name && (
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Route :</Text>
+              <Text style={styles.infoValue}>{user.route_name}</Text>
+            </View>
+          )}
           
           <View style={styles.sessionInfo}>
             <Text style={styles.sessionText}>
-              Current Session Login : Test Site 1 | 8072951720 | xxx@gmail.com
+              Current Session : {user?.site_name || 'N/A'} | {user?.phone || user?.mobile || 'N/A'} | {user?.email || 'N/A'}
             </Text>
           </View>
         </View>
 
+        {/* AMC Details Card */}
+        {!isLoadingAMC && amcSummary && (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>AMC DETAILS</Text>
+            
+            <View style={styles.amcSummaryRow}>
+              <View style={styles.amcSummaryItem}>
+                <Text style={styles.amcSummaryLabel}>Total Contracts</Text>
+                <Text style={styles.amcSummaryValue}>{amcSummary.totalContracts}</Text>
+              </View>
+              
+              <View style={styles.amcSummaryItem}>
+                <Text style={styles.amcSummaryLabel}>Active Contracts</Text>
+                <Text style={[styles.amcSummaryValue, { color: '#4CAF50' }]}>
+                  {amcSummary.activeContracts}
+                </Text>
+              </View>
+            </View>
+            
+            <View style={styles.amcFinancialRow}>
+              <View style={styles.amcFinancialItem}>
+                <Text style={styles.amcFinancialLabel}>Total Amount</Text>
+                <Text style={styles.amcFinancialValue}>
+                  ₹{amcSummary.totalAmount.toFixed(2)}
+                </Text>
+              </View>
+              
+              <View style={styles.amcFinancialItem}>
+                <Text style={styles.amcFinancialLabel}>Paid Amount</Text>
+                <Text style={[styles.amcFinancialValue, { color: '#4CAF50' }]}>
+                  ₹{amcSummary.paidAmount.toFixed(2)}
+                </Text>
+              </View>
+              
+              <View style={styles.amcFinancialItem}>
+                <Text style={styles.amcFinancialLabel}>Due Amount</Text>
+                <Text style={[styles.amcFinancialValue, { color: '#F44336' }]}>
+                  ₹{amcSummary.dueAmount.toFixed(2)}
+                </Text>
+              </View>
+            </View>
+            
+            {amcSummary.latestContract && (
+              <View style={styles.latestContractSection}>
+                <Text style={styles.latestContractTitle}>Latest Contract</Text>
+                <View style={styles.latestContractInfo}>
+                  <Text style={styles.latestContractLabel}>Contract ID:</Text>
+                  <Text style={styles.latestContractValue}>
+                    {amcSummary.latestContract.contractId}
+                  </Text>
+                </View>
+                <View style={styles.latestContractInfo}>
+                  <Text style={styles.latestContractLabel}>Status:</Text>
+                  <Text style={styles.latestContractValue}>
+                    {amcSummary.latestContract.status}
+                  </Text>
+                </View>
+                <View style={styles.latestContractInfo}>
+                  <Text style={styles.latestContractLabel}>Period:</Text>
+                  <Text style={styles.latestContractValue}>
+                    {amcSummary.latestContract.period}
+                  </Text>
+                </View>
+              </View>
+            )}
+            
+            <TouchableOpacity 
+              style={styles.viewAllButton}
+              onPress={() => navigateTo('/amc-contracts')}
+            >
+              <Text style={styles.viewAllButtonText}>View All AMC Contracts</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Action Buttons */}
         <View style={styles.actionButtonsContainer}>
           <TouchableOpacity style={styles.actionButton}>
-            <Text style={styles.actionButtonText}>No AMC</Text>
+            <Text style={styles.actionButtonText}>
+              {amcSummary ? `${amcSummary.totalContracts} AMC${amcSummary.totalContracts !== 1 ? 's' : ''}` : 'No AMC'}
+            </Text>
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.actionButton}>
@@ -359,6 +568,86 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#8B5CF6',
     fontWeight: '500',
+  },
+  amcSummaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 20,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  amcSummaryItem: {
+    alignItems: 'center',
+  },
+  amcSummaryLabel: {
+    fontSize: 12,
+    color: '#666666',
+    marginBottom: 5,
+  },
+  amcSummaryValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333333',
+  },
+  amcFinancialRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  amcFinancialItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  amcFinancialLabel: {
+    fontSize: 12,
+    color: '#666666',
+    marginBottom: 5,
+  },
+  amcFinancialValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333333',
+  },
+  latestContractSection: {
+    marginBottom: 15,
+  },
+  latestContractTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333333',
+    marginBottom: 10,
+  },
+  latestContractInfo: {
+    flexDirection: 'row',
+    marginBottom: 5,
+  },
+  latestContractLabel: {
+    fontSize: 14,
+    color: '#666666',
+    width: 80,
+  },
+  latestContractValue: {
+    fontSize: 14,
+    color: '#333333',
+    fontWeight: '500',
+    flex: 1,
+  },
+  viewAllButton: {
+    backgroundColor: '#4CAF50',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  viewAllButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 

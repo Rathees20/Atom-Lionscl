@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,8 +12,11 @@ import {
   Alert,
   KeyboardAvoidingView,
   Image,
+  Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '../contexts/NavigationContext';
+import { API_ENDPOINTS } from '../utils/api';
 
 const { width, height } = Dimensions.get('window');
 const isWeb = Platform.OS === 'web';
@@ -21,14 +24,25 @@ const isWeb = Platform.OS === 'web';
 const horizontalPadding = width <= 360 ? 12 : 20;
 const sectionSpacing = width <= 360 ? 18 : 25;
 
+interface Lift {
+  id: string;
+  name: string;
+  liftId?: string;
+  liftNumber?: string;
+}
+
 const AddComplaintPage: React.FC = () => {
   const { user, navigateTo } = useNavigation();
   const [contactPersonName, setContactPersonName] = useState('');
-  const [contactPersonMobile, setContactPersonMobile] = useState(user?.mobileNumber || '8072951720');
+  const [contactPersonMobile, setContactPersonMobile] = useState(user?.mobileNumber || user?.mobile || '');
   const [selectedLift, setSelectedLift] = useState('');
+  const [selectedLiftId, setSelectedLiftId] = useState('');
   const [selectedTemplates, setSelectedTemplates] = useState<string[]>([]);
   const [description, setDescription] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingLifts, setIsLoadingLifts] = useState(false);
+  const [lifts, setLifts] = useState<Lift[]>([]);
+  const [showLiftModal, setShowLiftModal] = useState(false);
 
   const complaintTemplates = [
     'LIFT NOT WORKING',
@@ -38,6 +52,108 @@ const AddComplaintPage: React.FC = () => {
     'Cabin Vibration',
   ];
 
+  // Load lifts when component mounts or when user email becomes available
+  useEffect(() => {
+    if (user?.email) {
+      loadLifts();
+    }
+  }, [user?.email]);
+
+  const loadLifts = async () => {
+    try {
+      setIsLoadingLifts(true);
+      
+      const userEmail = user?.email;
+      if (!userEmail) {
+        console.warn('User email not available for loading lifts');
+        setIsLoadingLifts(false);
+        return;
+      }
+      
+      const url = `${API_ENDPOINTS.CUSTOMER_LIFTS}?email=${encodeURIComponent(userEmail)}`;
+      console.log('Fetching lifts from:', url);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+      console.log('Lifts API Response:', JSON.stringify(data, null, 2));
+
+      if (response.ok) {
+        // Handle different response formats
+        let liftsArray: any[] = [];
+        
+        if (Array.isArray(data)) {
+          liftsArray = data;
+        } else if (data.lifts && Array.isArray(data.lifts)) {
+          liftsArray = data.lifts;
+        } else if (data.results && Array.isArray(data.results)) {
+          liftsArray = data.results;
+        } else if (data.data && Array.isArray(data.data)) {
+          liftsArray = data.data;
+        } else if (typeof data === 'object' && data !== null) {
+          // Try to find any array property
+          const keys = Object.keys(data);
+          for (const key of keys) {
+            if (Array.isArray(data[key])) {
+              liftsArray = data[key];
+              break;
+            }
+          }
+        }
+        
+        console.log('Extracted lifts array:', liftsArray);
+
+        // Map API response to Lift interface
+        const mappedLifts: Lift[] = liftsArray.map((item: any, index: number) => {
+          // Try multiple field name variations for ID
+          const id = item.id?.toString() || 
+                     item.lift_id?.toString() || 
+                     item.liftId?.toString() || 
+                     index.toString();
+          
+          // Try multiple field name variations for name
+          const name = item.name || 
+                       item.lift_name || 
+                       item.liftName ||
+                       item.lift_number || 
+                       item.liftNumber ||
+                       item.title ||
+                       item.label ||
+                       `Lift ${id}`;
+          
+          return {
+            id: id,
+            name: name,
+            liftId: item.lift_id?.toString() || item.liftId?.toString() || item.id?.toString() || id,
+            liftNumber: item.lift_number || item.liftNumber || item.number,
+          };
+        });
+
+        console.log('Mapped lifts:', mappedLifts);
+        setLifts(mappedLifts);
+        
+        if (mappedLifts.length === 0) {
+          console.warn('No lifts found in API response');
+        }
+      } else {
+        console.error('Error loading lifts:', data.error || data.message);
+        // Don't show alert for empty response, just log it
+        if (data.error || data.message) {
+          Alert.alert('Error', data.error || data.message || 'Failed to load lifts. Please try again.');
+        }
+      }
+    } catch (error) {
+      console.error('Error loading lifts:', error);
+      Alert.alert('Error', 'Network error. Please check your connection and try again.');
+    } finally {
+      setIsLoadingLifts(false);
+    }
+  };
 
   const handleTemplateToggle = (template: string) => {
     setSelectedTemplates(prev => 
@@ -58,7 +174,7 @@ const AddComplaintPage: React.FC = () => {
       return;
     }
 
-    if (!selectedLift.trim()) {
+    if (!selectedLift.trim() || !selectedLiftId) {
       Alert.alert('Error', 'Please select a lift');
       return;
     }
@@ -70,21 +186,67 @@ const AddComplaintPage: React.FC = () => {
 
     setIsLoading(true);
     
-    const complaintData = {
-      contactPersonName,
-      contactPersonMobile,
-      selectedLift,
-      selectedTemplates,
-      description,
-      timestamp: new Date().toISOString(),
-    };
+    try {
+      const userEmail = user?.email;
+      if (!userEmail) {
+        Alert.alert('Error', 'User email not found. Please login again.');
+        setIsLoading(false);
+        return;
+      }
 
-    // Simulate API call
-    setTimeout(() => {
+      // Prepare complaint data
+      const complaintData = {
+        email: userEmail,
+        contact_person_name: contactPersonName.trim(),
+        contact_person_mobile: contactPersonMobile.trim(),
+        lift_id: selectedLiftId,
+        lift_name: selectedLift,
+        complaint_templates: selectedTemplates,
+        description: description.trim(),
+        complaint_type: selectedTemplates.length > 0 ? selectedTemplates.join(', ') : description.trim(),
+      };
+
+      const response = await fetch(API_ENDPOINTS.CUSTOMER_COMPLAINTS, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(complaintData),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        Alert.alert('Success', data.message || 'Complaint submitted successfully!', [
+          {
+            text: 'OK',
+            onPress: () => {
+              // Reset form
+              setContactPersonName('');
+              setContactPersonMobile(user?.mobileNumber || user?.mobile || '');
+              setSelectedLift('');
+              setSelectedLiftId('');
+              setSelectedTemplates([]);
+              setDescription('');
+              navigateTo('/dashboard');
+            },
+          },
+        ]);
+      } else {
+        Alert.alert('Error', data.error || data.message || 'Failed to submit complaint. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error submitting complaint:', error);
+      Alert.alert('Error', 'Network error. Please check your connection and try again.');
+    } finally {
       setIsLoading(false);
-      Alert.alert('Success', 'Complaint submitted successfully!');
-      navigateTo('/dashboard');
-    }, 1000);
+    }
+  };
+
+  const handleLiftSelect = (lift: Lift) => {
+    setSelectedLift(lift.name);
+    setSelectedLiftId(lift.id);
+    setShowLiftModal(false);
   };
 
   const handleBack = () => {
@@ -161,13 +323,105 @@ const AddComplaintPage: React.FC = () => {
         {/* Select Lift */}
         <View style={styles.inputContainer}>
           <Text style={styles.inputLabel}>Select Lift</Text>
-          <TouchableOpacity style={styles.liftSelector}>
-            <Text style={selectedLift ? styles.liftSelectorText : styles.liftSelectorPlaceholder}>
-              {selectedLift || 'Select Lift'}
-            </Text>
-            <Text style={styles.dropdownIcon}>▼</Text>
+          <TouchableOpacity 
+            style={styles.liftSelector}
+            onPress={() => {
+              if (isLoadingLifts) {
+                return; // Don't open modal while loading
+              }
+              if (lifts.length === 0) {
+                // Try to reload lifts
+                Alert.alert(
+                  'No Lifts Available', 
+                  'No lifts found. Would you like to reload?',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Reload', onPress: () => loadLifts() },
+                  ]
+                );
+              } else {
+                setShowLiftModal(true);
+              }
+            }}
+            disabled={isLoadingLifts}
+          >
+            {isLoadingLifts ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color="#E91E63" />
+                <Text style={styles.loadingText}>Loading lifts...</Text>
+              </View>
+            ) : (
+              <>
+                <Text style={selectedLift ? styles.liftSelectorText : styles.liftSelectorPlaceholder}>
+                  {selectedLift || 'Select Lift'}
+                </Text>
+                <Text style={styles.dropdownIcon}>▼</Text>
+              </>
+            )}
           </TouchableOpacity>
+          {lifts.length > 0 && !isLoadingLifts && (
+            <Text style={styles.liftCountText}>
+              {lifts.length} lift{lifts.length !== 1 ? 's' : ''} available
+            </Text>
+          )}
         </View>
+
+        {/* Lift Selection Modal */}
+        <Modal
+          visible={showLiftModal}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setShowLiftModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Select Lift</Text>
+                <TouchableOpacity onPress={() => setShowLiftModal(false)}>
+                  <Text style={styles.modalCloseButton}>✕</Text>
+                </TouchableOpacity>
+              </View>
+              
+              <ScrollView style={styles.modalScrollView}>
+                {lifts.length === 0 ? (
+                  <View style={styles.emptyLiftsContainer}>
+                    <Text style={styles.emptyLiftsText}>No lifts available</Text>
+                    <TouchableOpacity 
+                      style={styles.retryButton}
+                      onPress={() => {
+                        setShowLiftModal(false);
+                        loadLifts();
+                      }}
+                    >
+                      <Text style={styles.retryButtonText}>Retry</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  lifts.map((lift) => (
+                    <TouchableOpacity
+                      key={lift.id}
+                      style={[
+                        styles.liftOption,
+                        selectedLiftId === lift.id && styles.liftOptionSelected
+                      ]}
+                      onPress={() => handleLiftSelect(lift)}
+                    >
+                      <Text style={[
+                        styles.liftOptionText,
+                        selectedLiftId === lift.id && styles.liftOptionTextSelected
+                      ]}>
+                        {lift.name}
+                      </Text>
+                      {selectedLiftId === lift.id && (
+                        <Text style={styles.checkmark}>✓</Text>
+                      )}
+                    </TouchableOpacity>
+                  ))
+                )}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
 
         {/* Complaint Templates */}
         <View style={styles.templatesContainer}>
@@ -380,6 +634,97 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     minHeight: 120,
     textAlignVertical: 'top',
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+  },
+  loadingText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#666666',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: height * 0.7,
+    paddingBottom: Platform.OS === 'ios' ? 30 : 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333333',
+  },
+  modalCloseButton: {
+    fontSize: 24,
+    color: '#666666',
+    fontWeight: '300',
+  },
+  modalScrollView: {
+    maxHeight: height * 0.6,
+  },
+  liftOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  liftOptionSelected: {
+    backgroundColor: '#FFF5F8',
+  },
+  liftOptionText: {
+    fontSize: 16,
+    color: '#333333',
+    flex: 1,
+  },
+  liftOptionTextSelected: {
+    color: '#E91E63',
+    fontWeight: '600',
+  },
+  emptyLiftsContainer: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  emptyLiftsText: {
+    fontSize: 16,
+    color: '#666666',
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: '#E91E63',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    marginTop: 10,
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  liftCountText: {
+    fontSize: 12,
+    color: '#666666',
+    marginTop: 5,
+    fontStyle: 'italic',
   },
 });
 

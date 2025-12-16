@@ -9,8 +9,10 @@ import {
   ScrollView,
   StatusBar,
   Image,
+  Alert,
 } from 'react-native';
 import { useNavigation } from '../contexts/NavigationContext';
+import { API_ENDPOINTS } from '../utils/api';
 
 const { width, height } = Dimensions.get('window');
 
@@ -25,7 +27,7 @@ interface Quotation {
 }
 
 const QuotationPage: React.FC = () => {
-  const { navigateTo } = useNavigation();
+  const { navigateTo, user } = useNavigation();
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -38,14 +40,59 @@ const QuotationPage: React.FC = () => {
     try {
       setIsLoading(true);
       
-      // Mock data - replace with actual API call
-      const mockQuotations: Quotation[] = [
-        // Empty array for now to show "No quotation found" message
-      ];
+      // Get email from user object
+      const userEmail = user?.email;
+      if (!userEmail) {
+        Alert.alert('Error', 'User email not found. Please login again.');
+        setQuotations([]);
+        setIsLoading(false);
+        return;
+      }
+      
+      // Add email as query parameter
+      const url = `${API_ENDPOINTS.CUSTOMER_QUOTATIONS}?email=${encodeURIComponent(userEmail)}`;
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
 
-      setQuotations(mockQuotations);
+      const data = await response.json();
+
+      if (response.ok) {
+        // Map API response to Quotation interface
+        // Adjust the mapping based on your actual API response structure
+        const mappedQuotations: Quotation[] = Array.isArray(data) 
+          ? data.map((item: any) => ({
+              id: item.id?.toString() || item.quotation_id?.toString() || '',
+              quotationNumber: item.quotation_number || item.quotationNumber || item.quotation_id?.toString() || 'N/A',
+              date: item.date || item.quotation_date || item.created_at || '',
+              amount: parseFloat(item.amount || item.total_amount || item.total || '0'),
+              status: (item.status || 'pending').toLowerCase() as 'pending' | 'approved' | 'rejected' | 'expired',
+              customer: item.customer_name || item.customer || user?.site_name || 'Customer',
+              validUntil: item.valid_until || item.validUntil || item.expiry_date || item.expires_at || '',
+            }))
+          : (data.quotations || data.results || []).map((item: any) => ({
+              id: item.id?.toString() || item.quotation_id?.toString() || '',
+              quotationNumber: item.quotation_number || item.quotationNumber || item.quotation_id?.toString() || 'N/A',
+              date: item.date || item.quotation_date || item.created_at || '',
+              amount: parseFloat(item.amount || item.total_amount || item.total || '0'),
+              status: (item.status || 'pending').toLowerCase() as 'pending' | 'approved' | 'rejected' | 'expired',
+              customer: item.customer_name || item.customer || user?.site_name || 'Customer',
+              validUntil: item.valid_until || item.validUntil || item.expiry_date || item.expires_at || '',
+            }));
+
+        setQuotations(mappedQuotations);
+      } else {
+        console.error('Error loading quotations:', data.error || data.message);
+        Alert.alert('Error', data.error || data.message || 'Failed to load quotations. Please try again.');
+        setQuotations([]);
+      }
     } catch (error) {
       console.error('Error loading quotations data:', error);
+      Alert.alert('Error', 'Network error. Please check your connection and try again.');
       setQuotations([]);
     } finally {
       setIsLoading(false);

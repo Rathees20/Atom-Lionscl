@@ -9,8 +9,10 @@ import {
   ScrollView,
   StatusBar,
   Image,
+  Alert,
 } from 'react-native';
 import { useNavigation } from '../contexts/NavigationContext';
+import { API_ENDPOINTS } from '../utils/api';
 
 const { width, height } = Dimensions.get('window');
 
@@ -24,7 +26,7 @@ interface Invoice {
 }
 
 const InvoicePage: React.FC = () => {
-  const { navigateTo } = useNavigation();
+  const { navigateTo, user } = useNavigation();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -37,14 +39,57 @@ const InvoicePage: React.FC = () => {
     try {
       setIsLoading(true);
       
-      // Mock data - replace with actual API call
-      const mockInvoices: Invoice[] = [
-        // Empty array for now to show "No invoice found" message
-      ];
+      // Get email from user object
+      const userEmail = user?.email;
+      if (!userEmail) {
+        Alert.alert('Error', 'User email not found. Please login again.');
+        setInvoices([]);
+        setIsLoading(false);
+        return;
+      }
+      
+      // Add email as query parameter
+      const url = `${API_ENDPOINTS.CUSTOMER_INVOICES}?email=${encodeURIComponent(userEmail)}`;
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
 
-      setInvoices(mockInvoices);
+      const data = await response.json();
+
+      if (response.ok) {
+        // Map API response to Invoice interface
+        // Adjust the mapping based on your actual API response structure
+        const mappedInvoices: Invoice[] = Array.isArray(data) 
+          ? data.map((item: any) => ({
+              id: item.id?.toString() || item.invoice_id?.toString() || '',
+              invoiceNumber: item.invoice_number || item.invoiceNumber || item.invoice_id?.toString() || 'N/A',
+              date: item.date || item.invoice_date || item.created_at || '',
+              amount: parseFloat(item.amount || item.total_amount || item.total || '0'),
+              status: (item.status || 'pending').toLowerCase() as 'paid' | 'pending' | 'overdue',
+              customer: item.customer_name || item.customer || user?.site_name || 'Customer',
+            }))
+          : (data.invoices || data.results || []).map((item: any) => ({
+              id: item.id?.toString() || item.invoice_id?.toString() || '',
+              invoiceNumber: item.invoice_number || item.invoiceNumber || item.invoice_id?.toString() || 'N/A',
+              date: item.date || item.invoice_date || item.created_at || '',
+              amount: parseFloat(item.amount || item.total_amount || item.total || '0'),
+              status: (item.status || 'pending').toLowerCase() as 'paid' | 'pending' | 'overdue',
+              customer: item.customer_name || item.customer || user?.site_name || 'Customer',
+            }));
+
+        setInvoices(mappedInvoices);
+      } else {
+        console.error('Error loading invoices:', data.error || data.message);
+        Alert.alert('Error', data.error || data.message || 'Failed to load invoices. Please try again.');
+        setInvoices([]);
+      }
     } catch (error) {
       console.error('Error loading invoices data:', error);
+      Alert.alert('Error', 'Network error. Please check your connection and try again.');
       setInvoices([]);
     } finally {
       setIsLoading(false);

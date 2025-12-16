@@ -12,6 +12,7 @@ import {
   Image,
 } from 'react-native';
 import { useNavigation } from '../contexts/NavigationContext';
+import { API_ENDPOINTS } from '../utils/api';
 
 const { width, height } = Dimensions.get('window');
 const isWeb = Platform.OS === 'web';
@@ -31,8 +32,8 @@ interface AMCContract {
 }
 
 const AMCContractsPage: React.FC = () => {
-  const { navigateTo, navigationData } = useNavigation();
-  const [contract, setContract] = useState<AMCContract | null>(null);
+  const { navigateTo, navigationData, user } = useNavigation();
+  const [contracts, setContracts] = useState<AMCContract[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
 
@@ -41,25 +42,95 @@ const AMCContractsPage: React.FC = () => {
     loadContractData();
   }, []);
 
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'overdue':
+        return '#FF9800';
+      case 'active':
+        return '#4CAF50';
+      case 'expired':
+        return '#F44336';
+      case 'pending':
+        return '#2196F3';
+      default:
+        return '#666666';
+    }
+  };
+
   const loadContractData = async () => {
     try {
       setIsLoading(true);
       
-      // Use navigation data if available, otherwise load from API
+      // Use navigation data if available (single contract detail view)
       if (navigationData) {
-        setContract(navigationData);
+        setContracts([navigationData]);
+        setIsLoading(false);
+        return;
+      }
+      
+      // Get email from user object
+      const userEmail = user?.email;
+      if (!userEmail) {
+        Alert.alert('Error', 'User email not found. Please login again.');
+        setContracts([]);
+        setIsLoading(false);
+        return;
+      }
+      
+      // Add email as query parameter
+      const url = `${API_ENDPOINTS.CUSTOMER_AMCS}?email=${encodeURIComponent(userEmail)}`;
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Map API response to AMCContract interface
+        const mappedContracts: AMCContract[] = Array.isArray(data) 
+          ? data.map((item: any) => ({
+              id: item.id?.toString() || item.amc_id?.toString() || '',
+              contractId: item.contract_id || item.contractId || item.amc_id?.toString() || 'N/A',
+              status: item.status || 'pending',
+              statusColor: getStatusColor(item.status || 'pending'),
+              period: item.period || item.contract_period || item.start_date && item.end_date 
+                ? `${item.start_date} - ${item.end_date}` : 'N/A',
+              periodStatus: item.period_status || item.status || 'Active',
+              amcType: item.amc_type || item.type || 'Standard',
+              contractAmount: item.contract_amount ? parseFloat(item.contract_amount) : undefined,
+              paidAmount: item.paid_amount ? parseFloat(item.paid_amount) : undefined,
+              dueAmount: item.due_amount ? parseFloat(item.due_amount) : undefined,
+              agreementUrl: item.agreement_url || item.agreementUrl || item.document_url,
+            }))
+          : (data.amcs || data.contracts || data.results || []).map((item: any) => ({
+              id: item.id?.toString() || item.amc_id?.toString() || '',
+              contractId: item.contract_id || item.contractId || item.amc_id?.toString() || 'N/A',
+              status: item.status || 'pending',
+              statusColor: getStatusColor(item.status || 'pending'),
+              period: item.period || item.contract_period || item.start_date && item.end_date 
+                ? `${item.start_date} - ${item.end_date}` : 'N/A',
+              periodStatus: item.period_status || item.status || 'Active',
+              amcType: item.amc_type || item.type || 'Standard',
+              contractAmount: item.contract_amount ? parseFloat(item.contract_amount) : undefined,
+              paidAmount: item.paid_amount ? parseFloat(item.paid_amount) : undefined,
+              dueAmount: item.due_amount ? parseFloat(item.due_amount) : undefined,
+              agreementUrl: item.agreement_url || item.agreementUrl || item.document_url,
+            }));
+
+        setContracts(mappedContracts);
       } else {
-        // TODO: Replace with actual API call
-        // const response = await fetch(`/api/amc-contracts/${contractId}`);
-        // const data = await response.json();
-        // setContract(data);
-        
-        // For now, show empty state - data will come from API
-        setContract(null);
+        console.error('Error loading AMC contracts:', data.error || data.message);
+        Alert.alert('Error', data.error || data.message || 'Failed to load AMC contracts. Please try again.');
+        setContracts([]);
       }
     } catch (error) {
       console.error('Error loading contract data:', error);
-      setContract(null);
+      Alert.alert('Error', 'Network error. Please check your connection and try again.');
+      setContracts([]);
     } finally {
       setIsLoading(false);
     }
@@ -69,7 +140,7 @@ const AMCContractsPage: React.FC = () => {
     navigateTo('/dashboard');
   };
 
-  const handleDownloadAgreement = async () => {
+  const handleDownloadAgreement = async (contract: AMCContract) => {
     if (!contract?.agreementUrl) {
       Alert.alert('Error', 'Agreement document is not available for download.');
       return;
@@ -116,21 +187,6 @@ const AMCContractsPage: React.FC = () => {
     return `₹ ${amount.toFixed(2)}`;
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'overdue':
-        return '#FF9800';
-      case 'active':
-        return '#4CAF50';
-      case 'expired':
-        return '#F44336';
-      case 'pending':
-        return '#2196F3';
-      default:
-        return '#666666';
-    }
-  };
-
   if (isLoading) {
     return (
       <View style={styles.container}>
@@ -159,7 +215,7 @@ const AMCContractsPage: React.FC = () => {
     );
   }
 
-  if (!contract) {
+  if (contracts.length === 0) {
     return (
       <View style={styles.container}>
         <StatusBar barStyle="light-content" backgroundColor="#4CAF50" />
@@ -208,54 +264,60 @@ const AMCContractsPage: React.FC = () => {
 
       {/* Main Content */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Contract Details Card */}
-        <View style={styles.contractCard}>
-          {/* Contract ID */}
-          <Text style={styles.contractId}>{contract.contractId}</Text>
-          
-          {/* Status */}
-          <Text style={[styles.status, { color: getStatusColor(contract.status) }]}>
-            {contract.status}
-          </Text>
-          
-          {/* Period */}
-          <View style={styles.periodContainer}>
-            <Text style={styles.periodText}>{contract.period}</Text>
-            <Text style={styles.periodStatus}>{contract.periodStatus}</Text>
-          </View>
-          
-          {/* AMC Type */}
-          <Text style={styles.amcType}>AMC Type: {contract.amcType}</Text>
-          
-          {/* Financial Details */}
-          <View style={styles.financialSection}>
-            <View style={styles.financialRow}>
-              <Text style={styles.financialLabel}>Contract Amount:</Text>
-              <Text style={styles.financialValue}>{formatCurrency(contract.contractAmount)}</Text>
+        {contracts.map((contract) => (
+          <View key={contract.id}>
+            {/* Contract Details Card */}
+            <View style={styles.contractCard}>
+              {/* Contract ID */}
+              <Text style={styles.contractId}>{contract.contractId}</Text>
+              
+              {/* Status */}
+              <Text style={[styles.status, { color: getStatusColor(contract.status) }]}>
+                {contract.status}
+              </Text>
+              
+              {/* Period */}
+              <View style={styles.periodContainer}>
+                <Text style={styles.periodText}>{contract.period}</Text>
+                <Text style={styles.periodStatus}>{contract.periodStatus}</Text>
+              </View>
+              
+              {/* AMC Type */}
+              <Text style={styles.amcType}>AMC Type: {contract.amcType}</Text>
+              
+              {/* Financial Details */}
+              <View style={styles.financialSection}>
+                <View style={styles.financialRow}>
+                  <Text style={styles.financialLabel}>Contract Amount:</Text>
+                  <Text style={styles.financialValue}>{formatCurrency(contract.contractAmount)}</Text>
+                </View>
+                
+                <View style={styles.financialRow}>
+                  <Text style={styles.financialLabel}>Paid Amount:</Text>
+                  <Text style={styles.financialValue}>{formatCurrency(contract.paidAmount)}</Text>
+                </View>
+                
+                <View style={styles.financialRow}>
+                  <Text style={styles.financialLabel}>Due Amount:</Text>
+                  <Text style={styles.financialValue}>{formatCurrency(contract.dueAmount)}</Text>
+                </View>
+              </View>
             </View>
-            
-            <View style={styles.financialRow}>
-              <Text style={styles.financialLabel}>Paid Amount:</Text>
-              <Text style={styles.financialValue}>{formatCurrency(contract.paidAmount)}</Text>
-            </View>
-            
-            <View style={styles.financialRow}>
-              <Text style={styles.financialLabel}>Due Amount:</Text>
-              <Text style={styles.financialValue}>{formatCurrency(contract.dueAmount)}</Text>
-            </View>
-          </View>
-        </View>
 
-        {/* Download Button */}
-        <TouchableOpacity 
-          style={[styles.downloadButton, isDownloading && styles.downloadButtonDisabled]}
-          onPress={handleDownloadAgreement}
-          disabled={isDownloading}
-        >
-          <Text style={styles.downloadButtonText}>
-            {isDownloading ? 'DOWNLOADING...' : 'DOWNLOAD AGREEMENT'}
-          </Text>
-        </TouchableOpacity>
+            {/* Download Button */}
+            {contract.agreementUrl && (
+              <TouchableOpacity 
+                style={[styles.downloadButton, isDownloading && styles.downloadButtonDisabled]}
+                onPress={() => handleDownloadAgreement(contract)}
+                disabled={isDownloading}
+              >
+                <Text style={styles.downloadButtonText}>
+                  {isDownloading ? 'DOWNLOADING...' : 'DOWNLOAD AGREEMENT'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        ))}
       </ScrollView>
     </View>
   );

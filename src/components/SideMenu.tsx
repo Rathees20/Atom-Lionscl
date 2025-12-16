@@ -170,8 +170,17 @@ const SideMenu: React.FC<SideMenuProps> = ({
     if (number && number.length === 10) {
       return `******${number.slice(6)}`;
     }
+    if (number && number.length > 0) {
+      // Handle numbers that might be longer or shorter
+      const last4 = number.slice(-4);
+      return `******${last4}`;
+    }
     return '******1720';
   };
+
+  // Get customer details from userData
+  const siteName = userData?.site_name || userData?.siteName || 'Customer';
+  const phoneNumber = userData?.mobile || userData?.phone || userData?.mobileNumber || '';
 
   return (
     <Modal
@@ -193,15 +202,17 @@ const SideMenu: React.FC<SideMenuProps> = ({
             <View style={styles.userInfo}>
               <View style={styles.userItem}>
                 <Text style={styles.userIcon}>👤</Text>
-                <Text style={styles.userText}>Test Site 1</Text>
+                <Text style={styles.userText}>{siteName}</Text>
               </View>
               
-              <View style={styles.userItem}>
-                <Image source={telephoneIcon} style={styles.userIconImage} resizeMode="contain" />
-                <Text style={styles.userText}>
-                  {formatMobileNumber(userData?.mobileNumber || '8072951720')}
-                </Text>
-              </View>
+              {phoneNumber && (
+                <View style={styles.userItem}>
+                  <Image source={telephoneIcon} style={styles.userIconImage} resizeMode="contain" />
+                  <Text style={styles.userText}>
+                    {formatMobileNumber(phoneNumber)}
+                  </Text>
+                </View>
+              )}
             </View>
           </View>
 
@@ -306,8 +317,12 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   userIcon: {
-    fontSize: 20,
+    fontSize: 24,
     marginRight: 15,
+    width: 24,
+    height: 24,
+    textAlign: 'center',
+    lineHeight: 24,
   },
   userIconImage: {
     width: 20,

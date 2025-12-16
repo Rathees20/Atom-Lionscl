@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '../contexts/NavigationContext';
+import { API_ENDPOINTS } from '../utils/api';
 
 const { width, height } = Dimensions.get('window');
 const isWeb = Platform.OS === 'web';
@@ -21,118 +22,123 @@ const isWeb = Platform.OS === 'web';
 const LoginPage: React.FC = () => {
   const { navigateTo, setUser } = useNavigation();
   const [email, setEmail] = useState('');
-  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [otpCode, setOtpCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [isFocusedEmail, setIsFocusedEmail] = useState(false);
-  const [resendTimer, setResendTimer] = useState(0);
-  const otpInputRefs = useRef<(TextInput | null)[]>([]);
+  const [isFocusedOtp, setIsFocusedOtp] = useState(false);
 
-  // Timer for resend OTP
-  useEffect(() => {
-    if (resendTimer > 0) {
-      const timer = setTimeout(() => setResendTimer(resendTimer - 1), 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [resendTimer]);
-
-  const validateEmail = (email: string) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  };
-
-  const handleSendOtp = async () => {
+  const handleGenerateOTP = async () => {
     if (!email.trim()) {
       Alert.alert('Error', 'Please enter your email address');
       return;
     }
 
-    if (!validateEmail(email)) {
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
       Alert.alert('Error', 'Please enter a valid email address');
       return;
     }
 
-    setIsSendingOtp(true);
-    // Simulate API call to send OTP
-    setTimeout(() => {
-      setIsSendingOtp(false);
-      setOtpSent(true);
-      setResendTimer(60); // 60 seconds cooldown
-      Alert.alert('Success', 'OTP has been sent to your email');
-      // Focus first OTP input
-      setTimeout(() => {
-        otpInputRefs.current[0]?.focus();
-      }, 100);
-    }, 1000);
+    setIsLoading(true);
+    try {
+      const response = await fetch(API_ENDPOINTS.CUSTOMER_GENERATE_OTP, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setOtpSent(true);
+        Alert.alert('Success', data.message || 'OTP sent to your email');
+      } else {
+        Alert.alert('Error', data.error || 'Failed to send OTP. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error generating OTP:', error);
+      Alert.alert('Error', 'Network error. Please check your connection and try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleOtpChange = (index: number, value: string) => {
-    if (value.length > 1) {
-      // Handle paste
-      const pastedOtp = value.slice(0, 6).split('');
-      const newOtp = [...otp];
-      pastedOtp.forEach((digit, i) => {
-        if (index + i < 6 && /^\d$/.test(digit)) {
-          newOtp[index + i] = digit;
-        }
-      });
-      setOtp(newOtp);
-      // Focus the next empty input or the last one
-      const nextIndex = Math.min(index + pastedOtp.length, 5);
-      otpInputRefs.current[nextIndex]?.focus();
+  const handleVerifyOTP = async () => {
+    if (!email.trim()) {
+      Alert.alert('Error', 'Please enter your email address');
       return;
     }
 
-    if (!/^\d*$/.test(value)) return; // Only allow digits
-
-    const newOtp = [...otp];
-    newOtp[index] = value;
-    setOtp(newOtp);
-
-    // Auto-focus next input
-    if (value && index < 5) {
-      otpInputRefs.current[index + 1]?.focus();
-    }
-  };
-
-  const handleOtpKeyPress = (index: number, key: string) => {
-    if (key === 'Backspace' && !otp[index] && index > 0) {
-      otpInputRefs.current[index - 1]?.focus();
-    }
-  };
-
-  const handleVerifyOtp = async () => {
-    const otpString = otp.join('');
-    if (otpString.length !== 6) {
-      Alert.alert('Error', 'Please enter the complete 6-digit OTP');
+    if (!otpCode.trim() || otpCode.length !== 6) {
+      Alert.alert('Error', 'Please enter a valid 6-digit OTP');
       return;
     }
 
     setIsLoading(true);
-    // Simulate API call to verify OTP
-    setTimeout(() => {
-      setIsLoading(false);
-      // Mock user data - replace with actual API call
-      setUser({
-        userId: email,
-        email: email,
-        mobileNumber: '',
+    try {
+      const response = await fetch(API_ENDPOINTS.CUSTOMER_VERIFY_OTP, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: email.trim(),
+          otp_code: otpCode.trim(),
+        }),
       });
-      navigateTo('/dashboard');
-    }, 1000);
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Store customer data and navigate to dashboard
+        setUser(data.customer);
+        navigateTo('/dashboard');
+      } else {
+        Alert.alert('Error', data.error || 'Invalid OTP. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error verifying OTP:', error);
+      Alert.alert('Error', 'Network error. Please check your connection and try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleResendOtp = () => {
-    if (resendTimer > 0) return;
-    setOtpSent(false);
-    setOtp(['', '', '', '', '', '']);
-    handleSendOtp();
+  const handleResendOTP = async () => {
+    if (!email.trim()) {
+      Alert.alert('Error', 'Please enter your email address');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await fetch(API_ENDPOINTS.CUSTOMER_RESEND_OTP, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        Alert.alert('Success', data.message || 'OTP resent to your email');
+      } else {
+        Alert.alert('Error', data.error || 'Failed to resend OTP. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error resending OTP:', error);
+      Alert.alert('Error', 'Network error. Please check your connection and try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleRegister = () => {
-    navigateTo('/register');
-  };
 
   return (
     <View style={styles.container}>
@@ -160,7 +166,7 @@ const LoginPage: React.FC = () => {
 
           {/* Email Input */}
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Email</Text>
+            <Text style={styles.inputLabel}>Email Address</Text>
             <View style={[
               styles.inputWrapper,
               isFocusedEmail && styles.inputWrapperFocused
@@ -189,99 +195,67 @@ const LoginPage: React.FC = () => {
             </View>
           </View>
 
-          {/* Send OTP Button */}
-          {!otpSent && (
-            <TouchableOpacity
-              style={[
-                styles.sendOtpButton,
-                (isSendingOtp || !email.trim() || !validateEmail(email)) && styles.sendOtpButtonDisabled
-              ]}
-              onPress={handleSendOtp}
-              disabled={isSendingOtp || !email.trim() || !validateEmail(email)}
-              activeOpacity={0.8}
-            >
-              {isSendingOtp ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
-              ) : (
-                <Text style={styles.sendOtpButtonText}>SEND OTP</Text>
-              )}
-            </TouchableOpacity>
-          )}
-
-          {/* OTP Input Section */}
+          {/* OTP Input - Show only after OTP is sent */}
           {otpSent && (
-            <>
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Enter OTP</Text>
-                <Text style={styles.otpInfoText}>
-                  We've sent a 6-digit OTP to {email}
-                </Text>
-                <View style={styles.otpContainer}>
-                  {otp.map((digit, index) => (
-                    <TextInput
-                      key={index}
-                      ref={(ref) => (otpInputRefs.current[index] = ref)}
-                      style={[
-                        styles.otpInput,
-                        digit ? styles.otpInputFilled : styles.otpInputEmpty
-                      ]}
-                      value={digit}
-                      onChangeText={(value) => handleOtpChange(index, value)}
-                      onKeyPress={({ nativeEvent }) => handleOtpKeyPress(index, nativeEvent.key)}
-                      keyboardType="numeric"
-                      maxLength={1}
-                      selectTextOnFocus
-                    />
-                  ))}
-                </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>OTP Code</Text>
+              <View style={[
+                styles.inputWrapper,
+                isFocusedOtp && styles.inputWrapperFocused
+              ]}>
+              <View style={styles.iconContainer}>
+                <Text style={styles.lockIcon}>🔐</Text>
               </View>
-
-              {/* Resend OTP */}
-              <View style={styles.resendContainer}>
-                <Text style={styles.resendText}>Didn't receive OTP? </Text>
-                <TouchableOpacity
-                  onPress={handleResendOtp}
-                  disabled={resendTimer > 0}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[
-                    styles.resendLink,
-                    resendTimer > 0 && styles.resendLinkDisabled
-                  ]}>
-                    {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend OTP'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Verify OTP Button */}
-              <TouchableOpacity
-                style={[
-                  styles.loginButton,
-                  (isLoading || otp.join('').length !== 6) && styles.loginButtonDisabled
-                ]}
-                onPress={handleVerifyOtp}
-                disabled={isLoading || otp.join('').length !== 6}
-                activeOpacity={0.8}
-              >
-                {isLoading ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
-                ) : (
-                  <>
-                    <Text style={styles.loginButtonText}>VERIFY & LOGIN</Text>
-                    <Text style={styles.arrowIcon}>→</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </>
+              <TextInput
+                style={styles.textInput}
+                value={otpCode}
+                onChangeText={setOtpCode}
+                placeholder="Enter 6-digit OTP"
+                placeholderTextColor="#999999"
+                keyboardType="number-pad"
+                maxLength={6}
+                autoCapitalize="none"
+                autoCorrect={false}
+                onFocus={() => setIsFocusedOtp(true)}
+                onBlur={() => setIsFocusedOtp(false)}
+              />
+            </View>
+            </View>
           )}
 
-          {/* Register Link */}
-          <View style={styles.registerSection}>
-            <Text style={styles.registerText}>Don't have an account? </Text>
-            <TouchableOpacity onPress={handleRegister}>
-              <Text style={styles.registerLinkText}>Register</Text>
+          {/* Resend OTP Link - Show only after OTP is sent */}
+          {otpSent && (
+            <TouchableOpacity 
+              style={styles.forgotPasswordLink}
+              onPress={handleResendOTP}
+              disabled={isLoading}
+            >
+              <Text style={styles.forgotPasswordText}>Resend OTP?</Text>
             </TouchableOpacity>
-          </View>
+          )}
+
+          {/* Generate OTP / Verify OTP Button */}
+          <TouchableOpacity
+            style={[
+              styles.loginButton,
+              (isLoading || !email.trim() || (otpSent && otpCode.length !== 6)) && styles.loginButtonDisabled
+            ]}
+            onPress={otpSent ? handleVerifyOTP : handleGenerateOTP}
+            disabled={isLoading || !email.trim() || (otpSent && otpCode.length !== 6)}
+            activeOpacity={0.8}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <>
+                <Text style={styles.loginButtonText}>
+                  {otpSent ? 'VERIFY OTP' : 'SEND OTP'}
+                </Text>
+                <Text style={styles.arrowIcon}>→</Text>
+              </>
+            )}
+          </TouchableOpacity>
+
         </View>
 
         {/* Footer */}
@@ -449,82 +423,15 @@ const styles = StyleSheet.create({
   eyeIcon: {
     fontSize: 20,
   },
-  sendOtpButton: {
-    backgroundColor: '#4CAF50',
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '100%',
+  forgotPasswordLink: {
+    alignSelf: 'flex-end',
     marginBottom: 24,
-    shadowColor: '#4CAF50',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
+    marginTop: -8,
   },
-  sendOtpButtonDisabled: {
-    backgroundColor: '#CCCCCC',
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  sendOtpButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-    letterSpacing: 1,
-  },
-  otpInfoText: {
-    fontSize: 13,
-    color: '#666666',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  otpContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 24,
-  },
-  otpInput: {
-    width: 50,
-    height: 60,
-    borderWidth: 2,
-    borderRadius: 12,
-    fontSize: 24,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    color: '#1A1A1A',
-  },
-  otpInputEmpty: {
-    borderColor: '#E0E0E0',
-    backgroundColor: '#F8F9FA',
-  },
-  otpInputFilled: {
-    borderColor: '#4CAF50',
-    backgroundColor: '#FFFFFF',
-  },
-  resendContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  resendText: {
-    fontSize: 14,
-    color: '#666666',
-  },
-  resendLink: {
+  forgotPasswordText: {
     fontSize: 14,
     color: '#4CAF50',
     fontWeight: '600',
-    textDecorationLine: 'underline',
-  },
-  resendLinkDisabled: {
-    color: '#CCCCCC',
-    textDecorationLine: 'none',
   },
   loginButton: {
     backgroundColor: '#4CAF50',
