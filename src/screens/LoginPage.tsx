@@ -142,7 +142,7 @@ const LoginPage: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#4CAF50" />
+      <StatusBar barStyle="light-content" backgroundColor="#FF6B6B" />
       <ScrollView 
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -278,7 +278,7 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   headerSection: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#FF6B6B',
     paddingTop: Platform.OS === 'ios' ? 60 : 40,
     paddingBottom: 50,
     paddingHorizontal: 20,
@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
   logoText: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: '#FF6B6B',
     letterSpacing: 2,
   },
   companyName: {
@@ -382,9 +382,9 @@ const styles = StyleSheet.create({
     minHeight: 56,
   },
   inputWrapperFocused: {
-    borderColor: '#4CAF50',
+    borderColor: '#FF6B6B',
     backgroundColor: '#FFFFFF',
-    shadowColor: '#4CAF50',
+    shadowColor: '#FF6B6B',
     shadowOffset: {
       width: 0,
       height: 0,
@@ -403,11 +403,11 @@ const styles = StyleSheet.create({
   inputIcon: {
     width: 20,
     height: 20,
-    tintColor: '#4CAF50',
+    tintColor: '#FF6B6B',
   },
   lockIcon: {
     fontSize: 20,
-    color: '#4CAF50',
+    color: '#FF6B6B',
   },
   textInput: {
     flex: 1,
@@ -430,11 +430,11 @@ const styles = StyleSheet.create({
   },
   forgotPasswordText: {
     fontSize: 14,
-    color: '#4CAF50',
+    color: '#FF6B6B',
     fontWeight: '600',
   },
   loginButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#FF6B6B',
     paddingVertical: 16,
     borderRadius: 12,
     flexDirection: 'row',
@@ -442,7 +442,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: '100%',
     marginBottom: 24,
-    shadowColor: '#4CAF50',
+    shadowColor: '#FF6B6B',
     shadowOffset: {
       width: 0,
       height: 4,
@@ -480,7 +480,7 @@ const styles = StyleSheet.create({
   },
   registerLinkText: {
     fontSize: 14,
-    color: '#4CAF50',
+    color: '#FF6B6B',
     fontWeight: '600',
     textDecorationLine: 'underline',
   },

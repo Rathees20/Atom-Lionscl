@@ -13,6 +13,7 @@ import {
   TextInput,
 } from 'react-native';
 import { useNavigation } from '../contexts/NavigationContext';
+import { API_ENDPOINTS } from '../utils/api';
 
 const { width, height } = Dimensions.get('window');
 const isWeb = Platform.OS === 'web';
@@ -31,7 +32,7 @@ interface Complaint {
 }
 
 const ComplaintsPage: React.FC = () => {
-  const { navigateTo, navigationData } = useNavigation();
+  const { navigateTo, navigationData, user } = useNavigation();
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -40,56 +41,194 @@ const ComplaintsPage: React.FC = () => {
 
   // Load complaints data on component mount
   useEffect(() => {
-    loadComplaintsData();
-  }, []);
+    if (user?.email) {
+      loadComplaintsData();
+    }
+  }, [user?.email]);
+
+  // Helper function to format date
+  const formatDate = (dateString: string): string => {
+    if (!dateString) return '';
+    try {
+      const date = new Date(dateString);
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const day = date.getDate();
+      const month = months[date.getMonth()];
+      const year = date.getFullYear();
+      return `${day} ${month}, ${year}`;
+    } catch (error) {
+      return dateString;
+    }
+  };
+
+  // Helper function to format time
+  const formatTime = (dateString: string): string => {
+    if (!dateString) return '';
+    try {
+      const date = new Date(dateString);
+      const hours = date.getHours().toString().padStart(2, '0');
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      const seconds = date.getSeconds().toString().padStart(2, '0');
+      return `${hours}:${minutes}:${seconds}`;
+    } catch (error) {
+      return dateString;
+    }
+  };
+
+  // Helper function to normalize status
+  const normalizeStatus = (status: string): 'open' | 'assigned' | 'in-progress' | 'closed' => {
+    const statusLower = status?.toLowerCase() || '';
+    if (statusLower.includes('closed')) return 'closed';
+    if (statusLower.includes('progress') || statusLower.includes('in-progress')) return 'in-progress';
+    if (statusLower.includes('assigned')) return 'assigned';
+    return 'open';
+  };
+
+  // Helper function to get priority from description or status
+  const getPriority = (item: any): 'low' | 'medium' | 'high' | 'urgent' => {
+    const description = (item.description || item.complaint_type || '').toLowerCase();
+    if (description.includes('urgent') || description.includes('emergency')) return 'urgent';
+    if (description.includes('not working') || description.includes('broken')) return 'high';
+    if (description.includes('noise') || description.includes('vibration')) return 'medium';
+    return 'low';
+  };
 
   const loadComplaintsData = async () => {
     try {
       setIsLoading(true);
       
-      // Mock data - replace with actual API call
-      const mockComplaints: Complaint[] = [
-        {
-          id: '1',
-          ticketNumber: '679',
-          createdDate: '22 Sep, 2025',
-          createdTime: '18:04:24',
-          assignedDate: '22 Sep, 2025',
-          assignedTime: '18:10:26',
-          status: 'closed',
-          statusText: '22 Sep, 2025 18:04:24 (closed)',
-          description: 'LIFT NOT WORKING - Controller Not in ON Position',
-          priority: 'high',
+      // Get email from user object
+      const userEmail = user?.email;
+      if (!userEmail) {
+        Alert.alert('Error', 'User email not found. Please login again.');
+        setComplaints([]);
+        setIsLoading(false);
+        return;
+      }
+      
+      // Add email as query parameter
+      const url = `${API_ENDPOINTS.CUSTOMER_COMPLAINTS}?email=${encodeURIComponent(userEmail)}`;
+      console.log('Fetching complaints from:', url);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        {
-          id: '2',
-          ticketNumber: '680',
-          createdDate: '23 Sep, 2025',
-          createdTime: '09:15:30',
-          assignedDate: '23 Sep, 2025',
-          assignedTime: '09:30:15',
-          status: 'in-progress',
-          statusText: '23 Sep, 2025 09:15:30 (in-progress)',
-          description: 'Abnormal Noise From Motor',
-          priority: 'medium',
-        },
-        {
-          id: '3',
-          ticketNumber: '681',
-          createdDate: '24 Sep, 2025',
-          createdTime: '14:22:45',
-          assignedDate: '24 Sep, 2025',
-          assignedTime: '14:45:20',
-          status: 'assigned',
-          statusText: '24 Sep, 2025 14:22:45 (assigned)',
-          description: 'Display Not Working',
-          priority: 'low',
-        },
-      ];
+      });
 
-      setComplaints(mockComplaints);
+      const data = await response.json();
+      console.log('Complaints API Response:', JSON.stringify(data, null, 2));
+
+      if (response.ok) {
+        // Handle different response formats
+        let complaintsArray: any[] = [];
+        
+        if (Array.isArray(data)) {
+          complaintsArray = data;
+        } else if (data.complaints && Array.isArray(data.complaints)) {
+          complaintsArray = data.complaints;
+        } else if (data.results && Array.isArray(data.results)) {
+          complaintsArray = data.results;
+        } else if (data.data && Array.isArray(data.data)) {
+          complaintsArray = data.data;
+        } else if (typeof data === 'object' && data !== null) {
+          // Try to find any array property
+          const keys = Object.keys(data);
+          for (const key of keys) {
+            if (Array.isArray(data[key])) {
+              complaintsArray = data[key];
+              break;
+            }
+          }
+        }
+        
+        console.log('Extracted complaints array:', complaintsArray);
+
+        // Map API response to Complaint interface
+        const mappedComplaints: Complaint[] = complaintsArray.map((item: any, index: number) => {
+          // Extract ID
+          const id = item.id?.toString() || 
+                     item.complaint_id?.toString() || 
+                     item.ticket_id?.toString() || 
+                     index.toString();
+          
+          // Extract ticket number
+          const ticketNumber = item.ticket_number?.toString() || 
+                               item.ticketNumber?.toString() || 
+                               item.ticket_id?.toString() || 
+                               item.id?.toString() || 
+                               id;
+          
+          // Extract dates and times
+          const createdDateStr = item.created_date || item.createdDate || item.created_at || item.date_created || '';
+          const assignedDateStr = item.assigned_date || item.assignedDate || item.assigned_at || item.date_assigned || createdDateStr;
+          
+          const createdDate = formatDate(createdDateStr);
+          const createdTime = formatTime(createdDateStr);
+          const assignedDate = formatDate(assignedDateStr);
+          const assignedTime = formatTime(assignedDateStr);
+          
+          // Extract status
+          const status = normalizeStatus(item.status || item.complaint_status || 'open');
+          const statusText = item.status_text || 
+                            item.statusText || 
+                            `${createdDate} ${createdTime} (${status})`;
+          
+          // Extract description
+          let description = item.description || 
+                           item.complaint_description || 
+                           item.complaint_type || 
+                           '';
+          
+          // Handle complaint_templates - could be array, string, or other
+          if (!description && item.complaint_templates) {
+            if (Array.isArray(item.complaint_templates)) {
+              description = item.complaint_templates.join(', ');
+            } else if (typeof item.complaint_templates === 'string') {
+              description = item.complaint_templates;
+            } else {
+              description = String(item.complaint_templates);
+            }
+          }
+          
+          if (!description) {
+            description = 'No description available';
+          }
+          
+          // Extract priority
+          const priority = item.priority || getPriority(item);
+          
+          return {
+            id: id,
+            ticketNumber: ticketNumber,
+            createdDate: createdDate,
+            createdTime: createdTime,
+            assignedDate: assignedDate,
+            assignedTime: assignedTime,
+            status: status,
+            statusText: statusText,
+            description: description,
+            priority: priority,
+          };
+        });
+
+        console.log('Mapped complaints:', mappedComplaints);
+        setComplaints(mappedComplaints);
+        
+        if (mappedComplaints.length === 0) {
+          console.warn('No complaints found in API response');
+        }
+      } else {
+        console.error('Error loading complaints:', data.error || data.message);
+        if (data.error || data.message) {
+          Alert.alert('Error', data.error || data.message || 'Failed to load complaints. Please try again.');
+        }
+        setComplaints([]);
+      }
     } catch (error) {
       console.error('Error loading complaints data:', error);
+      Alert.alert('Error', 'Network error. Please check your connection and try again.');
       setComplaints([]);
     } finally {
       setIsLoading(false);
@@ -124,7 +263,7 @@ const ComplaintsPage: React.FC = () => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'closed':
-        return '#4CAF50'; // Green
+        return '#FF6B6B'; // Light Red
       case 'in-progress':
         return '#FF9800'; // Orange
       case 'assigned':
@@ -159,7 +298,7 @@ const ComplaintsPage: React.FC = () => {
   if (isLoading) {
     return (
       <View style={styles.container}>
-        <StatusBar barStyle="light-content" backgroundColor="#4CAF50" />
+        <StatusBar barStyle="light-content" backgroundColor="#FF6B6B" />
         
         {/* Header */}
         <View style={styles.header}>
@@ -192,7 +331,7 @@ const ComplaintsPage: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#4CAF50" />
+      <StatusBar barStyle="light-content" backgroundColor="#FF6B6B" />
       
       {/* Header */}
       <View style={styles.header}>
@@ -303,7 +442,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5',
   },
   header: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#FF6B6B',
     paddingTop: Platform.OS === 'ios' ? 50 : 30,
     paddingBottom: 15,
     paddingHorizontal: 20,

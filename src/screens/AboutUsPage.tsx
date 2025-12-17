@@ -57,7 +57,7 @@ const AboutUsPage: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#4CAF50" />
+      <StatusBar barStyle="light-content" backgroundColor="#FF6B6B" />
       
       {/* Header */}
       <View style={styles.header}>
@@ -236,7 +236,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F7FA',
   },
   header: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#FF6B6B',
     paddingTop: Platform.OS === 'ios' ? 50 : 30,
     paddingBottom: 15,
     paddingHorizontal: 20,
@@ -298,13 +298,13 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 8,
     borderTopWidth: 4,
-    borderTopColor: '#4CAF50',
+    borderTopColor: '#FF6B6B',
   },
   logoContainer: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#FF6B6B',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 15,
@@ -317,7 +317,7 @@ const styles = StyleSheet.create({
   companyName: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: '#FF6B6B',
     textAlign: 'center',
     marginBottom: 8,
   },
@@ -331,7 +331,7 @@ const styles = StyleSheet.create({
   divider: {
     width: 60,
     height: 3,
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#FF6B6B',
     borderRadius: 2,
     marginBottom: 12,
   },
@@ -357,12 +357,12 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     marginRight: 10,
-    tintColor: '#4CAF50',
+    tintColor: '#FF6B6B',
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: '#FF6B6B',
   },
   aboutCard: {
     backgroundColor: '#FFFFFF',
@@ -415,7 +415,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#FF6B6B',
     borderRadius: 10,
     padding: 16,
     borderWidth: 2,
@@ -463,7 +463,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
     borderLeftWidth: 3,
-    borderLeftColor: '#4CAF50',
+    borderLeftColor: '#FF6B6B',
   },
   serviceIconContainer: {
     width: 24,
@@ -477,7 +477,7 @@ const styles = StyleSheet.create({
   },
   serviceIcon: {
     fontSize: 14,
-    color: '#4CAF50',
+    color: '#FF6B6B',
     fontWeight: 'bold',
   },
   serviceText: {
@@ -523,7 +523,7 @@ const styles = StyleSheet.create({
   contactIconImage: {
     width: 24,
     height: 24,
-    tintColor: '#4CAF50',
+    tintColor: '#FF6B6B',
   },
   contactInfo: {
     flex: 1,
@@ -531,7 +531,7 @@ const styles = StyleSheet.create({
   contactLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#4CAF50',
+    color: '#FF6B6B',
     marginBottom: 6,
   },
   contactValue: {
@@ -561,12 +561,12 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
     borderTopWidth: 3,
-    borderTopColor: '#4CAF50',
+    borderTopColor: '#FF6B6B',
   },
   statNumber: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: '#FF6B6B',
     marginBottom: 8,
   },
   statLabel: {

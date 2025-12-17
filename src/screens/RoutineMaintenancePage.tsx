@@ -14,6 +14,7 @@ import {
   Modal,
 } from 'react-native';
 import { useNavigation } from '../contexts/NavigationContext';
+import { API_ENDPOINTS } from '../utils/api';
 
 const { width, height } = Dimensions.get('window');
 const isWeb = Platform.OS === 'web';
@@ -27,7 +28,7 @@ interface MaintenanceItem {
 }
 
 const RoutineMaintenancePage: React.FC = () => {
-  const { navigateTo } = useNavigation();
+  const { navigateTo, user } = useNavigation();
   const [maintenanceItems, setMaintenanceItems] = useState<MaintenanceItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
@@ -54,8 +55,10 @@ const RoutineMaintenancePage: React.FC = () => {
 
   // Load maintenance items on component mount
   useEffect(() => {
-    loadMaintenanceItems();
-  }, []);
+    if (user?.email) {
+      loadMaintenanceItems();
+    }
+  }, [user?.email]);
 
   // Update filtered items when maintenance items change
   useEffect(() => {
@@ -65,30 +68,112 @@ const RoutineMaintenancePage: React.FC = () => {
   const loadMaintenanceItems = async () => {
     try {
       setIsLoading(true);
-      // TODO: Replace with actual API call
-      // Example API call:
-      // const response = await fetch('/api/maintenance-items', {
-      //   method: 'GET',
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //     'Authorization': `Bearer ${userToken}` // if needed
-      //   }
-      // });
-      // 
-      // if (!response.ok) {
-      //   throw new Error(`HTTP error! status: ${response.status}`);
-      // }
-      // 
-      // const data = await response.json();
-      // setMaintenanceItems(data);
       
-      // For now, set empty array - data will come from API
-      setMaintenanceItems([]);
+      const userEmail = user?.email;
+      if (!userEmail) {
+        Alert.alert('Error', 'User email not found. Please login again.');
+        setMaintenanceItems([]);
+        setIsLoading(false);
+        return;
+      }
+      
+      const url = `${API_ENDPOINTS.ROUTINE_SERVICES_ALL}?email=${encodeURIComponent(userEmail)}`;
+      console.log('Fetching routine services from:', url);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+      console.log('Routine services API Response:', JSON.stringify(data, null, 2));
+
+      if (response.ok) {
+        // Handle different response formats
+        let servicesArray: any[] = [];
+        
+        if (Array.isArray(data)) {
+          servicesArray = data;
+        } else if (data.services || data.routine_services || data.results) {
+          servicesArray = data.services || data.routine_services || data.results;
+          if (!Array.isArray(servicesArray)) {
+            servicesArray = [];
+          }
+        } else if (typeof data === 'object' && data !== null) {
+          // Try to find any array property
+          const keys = Object.keys(data);
+          for (const key of keys) {
+            if (Array.isArray(data[key])) {
+              servicesArray = data[key];
+              break;
+            }
+          }
+        }
+        
+        console.log('Extracted services array:', servicesArray);
+
+        // Map API response to MaintenanceItem interface
+        const mappedItems: MaintenanceItem[] = servicesArray.map((item: any, index: number) => {
+          // Extract ID
+          const id = item.id?.toString() || 
+                     item.service_id?.toString() || 
+                     item.maintenance_id?.toString() || 
+                     index.toString();
+          
+          // Extract service date
+          const serviceDate = item.service_date || 
+                             item.serviceDate || 
+                             item.date || 
+                             item.scheduled_date ||
+                             item.scheduledDate ||
+                             '';
+          
+          // Extract assign/technician
+          const assign = item.assign || 
+                        item.assigned_to || 
+                        item.assignedTo ||
+                        item.technician ||
+                        item.technician_name ||
+                        item.technicianName ||
+                        'Not assigned Yet';
+          
+          // Extract status
+          const status = (item.status || 'all').toLowerCase() as MaintenanceItem['status'];
+          
+          // Extract month
+          const month = item.month || 
+                       item.service_month ||
+                       item.serviceMonth ||
+                       (serviceDate ? new Date(serviceDate).toLocaleString('default', { month: 'long' }) : '');
+          
+          return {
+            id: id,
+            serviceDate: serviceDate,
+            assign: assign,
+            status: status,
+            month: month,
+          };
+        });
+
+        console.log('Mapped maintenance items:', mappedItems);
+        setMaintenanceItems(mappedItems);
+        
+        if (mappedItems.length === 0) {
+          console.warn('No maintenance items found in API response');
+        }
+      } else {
+        console.error('Error loading routine services:', data.error || data.message);
+        if (data.error || data.message) {
+          Alert.alert('Error', data.error || data.message || 'Failed to load routine services. Please try again.');
+        }
+        setMaintenanceItems([]);
+      }
     } catch (error) {
       console.error('Error loading maintenance items:', error);
+      Alert.alert('Error', 'Network error. Please check your connection and try again.');
       setMaintenanceItems([]);
-      // You could show an error message to the user here
-      // Alert.alert('Error', 'Failed to load maintenance items. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -186,7 +271,7 @@ const RoutineMaintenancePage: React.FC = () => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed':
-        return '#4CAF50';
+        return '#FF6B6B';
       case 'due':
         return '#FF9800';
       case 'overdue':
@@ -215,7 +300,7 @@ const RoutineMaintenancePage: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#4CAF50" />
+      <StatusBar barStyle="light-content" backgroundColor="#FF6B6B" />
       
       {/* Blue Header */}
       <View style={styles.header}>
@@ -432,7 +517,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5',
   },
   header: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#FF6B6B',
     paddingTop: Platform.OS === 'ios' ? 50 : 30,
     paddingBottom: 15,
     paddingHorizontal: 20,
@@ -567,7 +652,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 20,
     right: 20,
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#FF6B6B',
     borderRadius: 25,
     paddingVertical: 12,
     paddingHorizontal: 16,
@@ -639,7 +724,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: '#FF6B6B',
     marginBottom: 8,
   },
   modalSubtitle: {
@@ -710,11 +795,11 @@ const styles = StyleSheet.create({
     color: '#333333',
   },
   dropdownOptionTextSelected: {
-    color: '#4CAF50',
+    color: '#FF6B6B',
     fontWeight: '600',
   },
   filterSearchButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#FF6B6B',
     borderRadius: 8,
     paddingVertical: 15,
     alignItems: 'center',

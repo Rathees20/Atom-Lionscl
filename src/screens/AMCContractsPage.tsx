@@ -47,7 +47,7 @@ const AMCContractsPage: React.FC = () => {
       case 'overdue':
         return '#FF9800';
       case 'active':
-        return '#4CAF50';
+        return '#FF6B6B';
       case 'expired':
         return '#F44336';
       case 'pending':
@@ -190,7 +190,7 @@ const AMCContractsPage: React.FC = () => {
   if (isLoading) {
     return (
       <View style={styles.container}>
-        <StatusBar barStyle="light-content" backgroundColor="#4CAF50" />
+        <StatusBar barStyle="light-content" backgroundColor="#FF6B6B" />
         
         {/* Header */}
         <View style={styles.header}>
@@ -218,7 +218,7 @@ const AMCContractsPage: React.FC = () => {
   if (contracts.length === 0) {
     return (
       <View style={styles.container}>
-        <StatusBar barStyle="light-content" backgroundColor="#4CAF50" />
+        <StatusBar barStyle="light-content" backgroundColor="#FF6B6B" />
         
         {/* Header */}
         <View style={styles.header}>
@@ -245,7 +245,7 @@ const AMCContractsPage: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#4CAF50" />
+      <StatusBar barStyle="light-content" backgroundColor="#FF6B6B" />
       
       {/* Header */}
       <View style={styles.header}>
@@ -329,7 +329,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5',
   },
   header: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#FF6B6B',
     paddingTop: Platform.OS === 'ios' ? 50 : 30,
     paddingBottom: 15,
     paddingHorizontal: 20,

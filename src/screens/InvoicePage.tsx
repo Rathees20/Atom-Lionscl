@@ -103,7 +103,7 @@ const InvoicePage: React.FC = () => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'paid':
-        return '#4CAF50'; // Green
+        return '#FF6B6B'; // Light Red
       case 'pending':
         return '#FF9800'; // Orange
       case 'overdue':
@@ -116,7 +116,7 @@ const InvoicePage: React.FC = () => {
   if (isLoading) {
     return (
       <View style={styles.container}>
-        <StatusBar barStyle="light-content" backgroundColor="#4CAF50" />
+        <StatusBar barStyle="light-content" backgroundColor="#FF6B6B" />
         
         {/* Header */}
         <View style={styles.header}>
@@ -143,7 +143,7 @@ const InvoicePage: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#4CAF50" />
+      <StatusBar barStyle="light-content" backgroundColor="#FF6B6B" />
       
       {/* Header */}
       <View style={styles.header}>
@@ -195,7 +195,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5',
   },
   header: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#FF6B6B',
     paddingTop: Platform.OS === 'ios' ? 50 : 30,
     paddingBottom: 15,
     paddingHorizontal: 20,

@@ -130,7 +130,7 @@ const ProfileSwitchPage: React.FC = () => {
       case 'technician':
         return '#FF9800'; // Orange
       case 'customer':
-        return '#4CAF50'; // Green
+        return '#FF6B6B'; // Light Red
       default:
         return '#666666';
     }
@@ -139,7 +139,7 @@ const ProfileSwitchPage: React.FC = () => {
   if (isLoading) {
     return (
       <View style={styles.container}>
-        <StatusBar barStyle="light-content" backgroundColor="#4CAF50" />
+        <StatusBar barStyle="light-content" backgroundColor="#FF6B6B" />
         
         {/* Header */}
         <View style={styles.header}>
@@ -166,7 +166,7 @@ const ProfileSwitchPage: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#4CAF50" />
+      <StatusBar barStyle="light-content" backgroundColor="#FF6B6B" />
       
       {/* Header */}
       <View style={styles.header}>
@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5',
   },
   header: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#FF6B6B',
     paddingTop: Platform.OS === 'ios' ? 50 : 30,
     paddingBottom: 15,
     paddingHorizontal: 20,
@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   activeProfileCard: {
-    borderColor: '#4CAF50',
+    borderColor: '#FF6B6B',
     backgroundColor: '#F8FFF8',
   },
   profileHeader: {
@@ -357,7 +357,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   activeIndicator: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#FF6B6B',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,

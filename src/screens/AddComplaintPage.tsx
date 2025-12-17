@@ -206,7 +206,8 @@ const AddComplaintPage: React.FC = () => {
         complaint_type: selectedTemplates.length > 0 ? selectedTemplates.join(', ') : description.trim(),
       };
 
-      const response = await fetch(API_ENDPOINTS.CUSTOMER_COMPLAINTS, {
+      console.log('Submitting complaint:', complaintData);
+      const response = await fetch(API_ENDPOINTS.CUSTOMER_CREATE_COMPLAINT, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -214,26 +215,51 @@ const AddComplaintPage: React.FC = () => {
         body: JSON.stringify(complaintData),
       });
 
-      const data = await response.json();
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
 
-      if (response.ok) {
-        Alert.alert('Success', data.message || 'Complaint submitted successfully!', [
+      let data;
+      try {
+        const text = await response.text();
+        console.log('Response text:', text);
+        data = text ? JSON.parse(text) : {};
+      } catch (parseError) {
+        console.error('Error parsing response:', parseError);
+        data = {};
+      }
+
+      // Check if request was successful (status 200-299 or 201 for created)
+      if (response.ok || response.status === 201 || response.status === 200) {
+        // Reset form first
+        setContactPersonName('');
+        setContactPersonMobile(user?.mobileNumber || user?.mobile || '');
+        setSelectedLift('');
+        setSelectedLiftId('');
+        setSelectedTemplates([]);
+        setDescription('');
+        
+        // Show success message
+        const successMessage = data.message || 
+                              data.success || 
+                              data.detail || 
+                              'Complaint submitted successfully!';
+        
+        Alert.alert('Success', successMessage, [
           {
             text: 'OK',
             onPress: () => {
-              // Reset form
-              setContactPersonName('');
-              setContactPersonMobile(user?.mobileNumber || user?.mobile || '');
-              setSelectedLift('');
-              setSelectedLiftId('');
-              setSelectedTemplates([]);
-              setDescription('');
               navigateTo('/dashboard');
             },
           },
         ]);
       } else {
-        Alert.alert('Error', data.error || data.message || 'Failed to submit complaint. Please try again.');
+        // Handle error response
+        const errorMessage = data.error || 
+                           data.message || 
+                           data.detail || 
+                           data.non_field_errors?.[0] ||
+                           `Failed to submit complaint. Status: ${response.status}`;
+        Alert.alert('Error', errorMessage);
       }
     } catch (error) {
       console.error('Error submitting complaint:', error);

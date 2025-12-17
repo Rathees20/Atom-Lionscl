@@ -12,6 +12,7 @@ import {
   Image,
 } from 'react-native';
 import { useNavigation } from '../contexts/NavigationContext';
+import { API_ENDPOINTS } from '../utils/api';
 
 const { width, height } = Dimensions.get('window');
 const isWeb = Platform.OS === 'web';
@@ -19,6 +20,7 @@ const isWeb = Platform.OS === 'web';
 interface TicketDetails {
   id: string;
   ticketId: string;
+  ticketNumber?: string;
   siteId: string;
   siteName: string;
   address: string;
@@ -30,6 +32,26 @@ interface TicketDetails {
   duration: string;
   status: string;
   statusColor: string;
+  // Additional fields for ticket info
+  subject?: string;
+  type?: string;
+  contactPersonName?: string;
+  contactPersonMobile?: string;
+  description?: string;
+  priority?: string;
+  solutionProvided?: string;
+  technicianRemark?: string;
+  technicianSignature?: string;
+  customerSignature?: string;
+  signatureHolderName?: string;
+  signatureHolderDesignation?: string;
+  closedBy?: string;
+  closeMode?: string;
+  projectName?: string;
+  amcRef?: string;
+  amcType?: string;
+  amcStatus?: string;
+  amcExpiryDate?: string;
 }
 
 interface CollapsibleSection {
@@ -42,10 +64,346 @@ interface CollapsibleSection {
 }
 
 const TicketDetailsPage: React.FC = () => {
-  const { navigateTo, navigationData } = useNavigation();
+  const { navigateTo, navigationData, user } = useNavigation();
   const [ticketDetails, setTicketDetails] = useState<TicketDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [collapsibleSections, setCollapsibleSections] = useState<CollapsibleSection[]>([
+  const [ticketData, setTicketData] = useState<any>(null);
+  const [collapsibleSections, setCollapsibleSections] = useState<CollapsibleSection[]>([]);
+
+  // Load ticket details on component mount
+  useEffect(() => {
+    loadTicketDetails();
+  }, [navigationData]);
+
+  // Update collapsible sections when ticket details change
+  useEffect(() => {
+    if (ticketDetails) {
+      updateCollapsibleSections();
+    }
+  }, [ticketDetails]);
+
+  // Helper function to format date
+  const formatDate = (dateString: string): string => {
+    if (!dateString) return '';
+    try {
+      const date = new Date(dateString);
+      const day = date.getDate().toString().padStart(2, '0');
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
+    } catch (error) {
+      return dateString;
+    }
+  };
+
+  // Helper function to format time
+  const formatTime = (dateString: string): string => {
+    if (!dateString) return '';
+    try {
+      const date = new Date(dateString);
+      const hours = date.getHours();
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      const displayHours = hours % 12 || 12;
+      return `${displayHours}:${minutes} ${ampm}`;
+    } catch (error) {
+      return dateString;
+    }
+  };
+
+  // Helper function to get status color
+  const getStatusColor = (status: string): string => {
+    const statusLower = status?.toLowerCase() || '';
+    if (statusLower.includes('closed')) return '#FF6B6B';
+    if (statusLower.includes('progress') || statusLower.includes('in-progress')) return '#FF9800';
+    if (statusLower.includes('assigned')) return '#2196F3';
+    return '#F44336';
+  };
+
+  const loadTicketDetails = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Get complaint ID or ticket number from navigation data
+      const complaintId = navigationData?.id || navigationData?.ticketNumber || navigationData?.ticketId;
+      
+      if (!complaintId) {
+        Alert.alert('Error', 'Ticket ID not found.');
+        setIsLoading(false);
+        return;
+      }
+
+      const userEmail = user?.email;
+      if (!userEmail) {
+        Alert.alert('Error', 'User email not found. Please login again.');
+        setIsLoading(false);
+        return;
+      }
+
+      // Try multiple endpoint formats
+      // First try: Get all complaints and find the matching one
+      const url = `${API_ENDPOINTS.CUSTOMER_COMPLAINTS}?email=${encodeURIComponent(userEmail)}`;
+      console.log('Fetching ticket details from:', url);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      let data;
+      try {
+        const text = await response.text();
+        console.log('Response text:', text.substring(0, 200));
+        
+        if (!text || text.trim().startsWith('<!DOCTYPE')) {
+          throw new Error('Received HTML instead of JSON (likely 404 page)');
+        }
+        
+        data = text ? JSON.parse(text) : {};
+      } catch (parseError) {
+        console.error('Error parsing response:', parseError);
+        // Try alternative endpoint format
+        const altUrl = `${API_ENDPOINTS.CUSTOMER_COMPLAINTS}${complaintId}/?email=${encodeURIComponent(userEmail)}`;
+        console.log('Trying alternative URL:', altUrl);
+        
+        try {
+          const altResponse = await fetch(altUrl, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          });
+          
+          const altText = await altResponse.text();
+          if (altText && !altText.trim().startsWith('<!DOCTYPE')) {
+            data = altText ? JSON.parse(altText) : {};
+          } else {
+            throw new Error('Alternative endpoint also failed');
+          }
+        } catch (altError) {
+          console.error('Alternative endpoint also failed:', altError);
+          Alert.alert('Error', 'Failed to load ticket details. The ticket may not exist or the API endpoint is incorrect.');
+          setTicketDetails(null);
+          setIsLoading(false);
+          return;
+        }
+      }
+
+      console.log('Ticket details API Response:', JSON.stringify(data, null, 2));
+
+      if (response.ok || data) {
+        // Handle different response formats
+        let ticketData = data;
+        
+        // If response is an array, find the matching complaint
+        if (Array.isArray(data)) {
+          ticketData = data.find((item: any) => {
+            const itemId = item.id?.toString() || 
+                          item.complaint_id?.toString() || 
+                          item.ticket_id?.toString() || 
+                          item.ticket_number?.toString() || 
+                          '';
+            const itemTicketNumber = item.ticket_number?.toString() || 
+                                   item.ticketNumber?.toString() || 
+                                   item.ticket_id?.toString() || 
+                                   '';
+            return itemId === complaintId.toString() || 
+                   itemTicketNumber === complaintId.toString() ||
+                   item.id?.toString() === complaintId.toString();
+          });
+          
+          if (!ticketData) {
+            Alert.alert('Error', 'Ticket not found in the list.');
+            setTicketDetails(null);
+            setIsLoading(false);
+            return;
+          }
+        }
+        
+        setTicketData(ticketData);
+        
+        // Log ticketData to help debug field names
+        console.log('Ticket Data from API:', JSON.stringify(ticketData, null, 2));
+        console.log('Available fields in ticketData:', Object.keys(ticketData || {}));
+        
+        // Use navigationData as fallback for missing fields
+        const navData = navigationData || {};
+        
+        // Map API response to TicketDetails interface with better field extraction
+        const ticketDetails: TicketDetails = {
+          id: ticketData.id?.toString() || navData.id?.toString() || complaintId,
+          ticketId: ticketData.ticket_number?.toString() || 
+                   ticketData.ticketNumber?.toString() || 
+                   ticketData.ticket_id?.toString() || 
+                   navData.ticketNumber?.toString() ||
+                   navData.ticketId?.toString() ||
+                   complaintId,
+          ticketNumber: ticketData.ticket_number?.toString() || 
+                       ticketData.ticketNumber?.toString() || 
+                       navData.ticketNumber?.toString(),
+          siteId: ticketData.site_id?.toString() || 
+                 ticketData.siteId?.toString() || 
+                 ticketData.site?.id?.toString() || 
+                 ticketData.lift?.site_id?.toString() ||
+                 ticketData.lift?.siteId?.toString() ||
+                 '',
+          siteName: ticketData.site_name || 
+                   ticketData.siteName || 
+                   ticketData.site?.name || 
+                   ticketData.lift?.site_name ||
+                   ticketData.lift?.siteName ||
+                   ticketData.project_name || 
+                   ticketData.projectName ||
+                   ticketData.lift_name ||
+                   ticketData.liftName ||
+                   '',
+          address: ticketData.address || 
+                  ticketData.site?.address || 
+                  ticketData.lift?.address ||
+                  ticketData.project_address || 
+                  ticketData.projectAddress ||
+                  '',
+          assignAt: formatTime(ticketData.assigned_date || ticketData.assigned_at || ticketData.assign_date || 
+                              navData.assignedTime || navData.assignedTime || ''),
+          assignDate: formatDate(ticketData.assigned_date || ticketData.assigned_at || ticketData.assign_date || 
+                                ticketData.created_date || ticketData.created_at ||
+                                navData.assignedDate || navData.createdDate || ''),
+          assignTo: ticketData.assigned_to || 
+                   ticketData.assignTo || 
+                   ticketData.assigned_technician || 
+                   ticketData.assignedTechnician ||
+                   ticketData.technician_name ||
+                   ticketData.technicianName ||
+                   ticketData.assigned_user ||
+                   ticketData.assignedUser ||
+                   ticketData.assigned_user_name ||
+                   ticketData.assignedUserName ||
+                   ticketData.technician ||
+                   ticketData.assignee ||
+                   ticketData.assigned_person ||
+                   ticketData.assignedPerson ||
+                   ticketData.technician?.name ||
+                   ticketData.technician?.full_name ||
+                   ticketData.assigned_to_user?.name ||
+                   ticketData.assigned_to_user?.full_name ||
+                   ticketData.user?.name ||
+                   ticketData.user?.full_name ||
+                   '',
+          attendAt: ticketData.attend_at ? `${formatDate(ticketData.attend_at)} ${formatTime(ticketData.attend_at)}` : 
+                   ticketData.attended_at ? `${formatDate(ticketData.attended_at)} ${formatTime(ticketData.attended_at)}` : 
+                   ticketData.attended_date ? `${formatDate(ticketData.attended_date)} ${formatTime(ticketData.attended_date)}` :
+                   '',
+          attendBy: ticketData.attend_by || 
+                   ticketData.attendBy || 
+                   ticketData.attended_by || 
+                   ticketData.attendedBy ||
+                   ticketData.technician_name ||
+                   '',
+          duration: ticketData.duration || 
+                   ticketData.time_taken || 
+                   ticketData.timeTaken ||
+                   '',
+          status: ticketData.status || navData.status || 'open',
+          statusColor: getStatusColor(ticketData.status || navData.status || 'open'),
+          // Additional fields
+          subject: ticketData.subject || 
+                  ticketData.complaint_type || 
+                  ticketData.complaintType ||
+                  ticketData.description?.substring(0, 50) || 
+                  navData.description?.substring(0, 50) ||
+                  '',
+          type: ticketData.type || 
+               ticketData.complaint_category || 
+               ticketData.complaintCategory ||
+               ticketData.category ||
+               'Break Down Calls',
+          contactPersonName: ticketData.contact_person_name || 
+                           ticketData.contactPersonName || 
+                           ticketData.contact_name ||
+                           '',
+          contactPersonMobile: ticketData.contact_person_mobile || 
+                             ticketData.contactPersonMobile || 
+                             ticketData.contact_mobile ||
+                             '',
+          description: ticketData.description || 
+                     (Array.isArray(ticketData.complaint_templates) ? ticketData.complaint_templates.join(', ') : 
+                      typeof ticketData.complaint_templates === 'string' ? ticketData.complaint_templates : 
+                      ticketData.complaint_templates ? String(ticketData.complaint_templates) : '') || 
+                     navData.description ||
+                     '',
+          priority: ticketData.priority || navData.priority || 'medium',
+          solutionProvided: ticketData.solution_provided || 
+                           ticketData.solutionProvided || 
+                           ticketData.solution || 
+                           '',
+          technicianRemark: ticketData.technician_remark || 
+                          ticketData.technicianRemark || 
+                          ticketData.remark || 
+                          ticketData.technician_comment ||
+                          '',
+          technicianSignature: ticketData.technician_signature || 
+                             ticketData.technicianSignature || 
+                             '',
+          customerSignature: ticketData.customer_signature || 
+                            ticketData.customerSignature || 
+                            '',
+          signatureHolderName: ticketData.signature_holder_name || 
+                              ticketData.signatureHolderName || 
+                              '',
+          signatureHolderDesignation: ticketData.signature_holder_designation || 
+                                    ticketData.signatureHolderDesignation || 
+                                    '',
+          closedBy: ticketData.closed_by || 
+                   ticketData.closedBy || 
+                   '',
+          closeMode: ticketData.close_mode || 
+                    ticketData.closeMode || 
+                    '',
+          projectName: ticketData.project_name || 
+                      ticketData.projectName || 
+                      ticketData.site_name || 
+                      ticketData.siteName ||
+                      ticketData.lift_name ||
+                      ticketData.liftName ||
+                      '',
+          amcRef: ticketData.amc_ref || 
+                 ticketData.amcRef || 
+                 ticketData.amc_reference ||
+                 '',
+          amcType: ticketData.amc_type || 
+                  ticketData.amcType || 
+                  '',
+          amcStatus: ticketData.amc_status || 
+                    ticketData.amcStatus || 
+                    '',
+          amcExpiryDate: ticketData.amc_expiry_date ? formatDate(ticketData.amc_expiry_date) : 
+                       ticketData.amcExpiryDate ? formatDate(ticketData.amcExpiryDate) : 
+                       '',
+        };
+        
+        console.log('Mapped ticket details:', ticketDetails);
+
+        setTicketDetails(ticketDetails);
+      } else {
+        console.error('Error loading ticket details:', data.error || data.message);
+        Alert.alert('Error', data.error || data.message || 'Failed to load ticket details. Please try again.');
+        setTicketDetails(null);
+      }
+    } catch (error) {
+      console.error('Error loading ticket details:', error);
+      Alert.alert('Error', 'Network error. Please check your connection and try again.');
+      setTicketDetails(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const updateCollapsibleSections = () => {
+    if (!ticketDetails) return;
+
+    const sections: CollapsibleSection[] = [
     {
       id: 'ticket-info',
       title: 'Ticket Info',
@@ -54,65 +412,93 @@ const TicketDetailsPage: React.FC = () => {
       isExpanded: false,
       content: (
         <View style={styles.ticketInfoContent}>
+            {ticketDetails.subject && (
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Subject:</Text>
-            <Text style={styles.infoValue}>LIFT NOT WORKING.</Text>
+                <Text style={styles.infoValue}>{ticketDetails.subject}</Text>
           </View>
+            )}
           
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Type:</Text>
-            <Text style={styles.infoValue}>Break Down Calls</Text>
+              <Text style={styles.infoValue}>{ticketDetails.type || 'Break Down Calls'}</Text>
           </View>
           
+            {ticketDetails.contactPersonName && (
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Contact Person Name:</Text>
-            <Text style={styles.infoValue}>Suriya</Text>
+                <Text style={styles.infoValue}>{ticketDetails.contactPersonName}</Text>
           </View>
+            )}
           
+            {ticketDetails.contactPersonMobile && (
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Contact Person Mobile No:</Text>
-            <Text style={styles.infoValue}>9597754821</Text>
+                <Text style={styles.infoValue}>{ticketDetails.contactPersonMobile}</Text>
           </View>
+            )}
           
+            {ticketDetails.description && (
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Description:</Text>
-            <Text style={styles.infoValue}></Text>
+                <Text style={styles.infoValue}>{ticketDetails.description}</Text>
           </View>
+            )}
           
+            {ticketDetails.priority && (
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Priority:</Text>
-            <Text style={[styles.infoValue, { color: '#F44336', fontWeight: 'bold' }]}>High</Text>
+                <Text style={[styles.infoValue, { color: '#F44336', fontWeight: 'bold' }]}>
+                  {ticketDetails.priority.charAt(0).toUpperCase() + ticketDetails.priority.slice(1)}
+                </Text>
           </View>
+            )}
           
+            {ticketDetails.solutionProvided && (
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Solution Provided:</Text>
-            <Text style={styles.infoValue}>part replaced, Customer Side Power issues</Text>
+                <Text style={styles.infoValue}>{ticketDetails.solutionProvided}</Text>
           </View>
+            )}
           
+            {ticketDetails.technicianRemark && (
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Technician Remark:</Text>
-            <Text style={styles.infoValue}>lift normal</Text>
+                <Text style={styles.infoValue}>{ticketDetails.technicianRemark}</Text>
           </View>
+            )}
           
+            {ticketDetails.technicianSignature && (
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Technician Signature:</Text>
-            <Text style={[styles.infoValue, styles.signatureText]}>[Signature]</Text>
+                <Text style={[styles.infoValue, styles.signatureText]}>
+                  {ticketDetails.technicianSignature || '[Signature]'}
+                </Text>
           </View>
+            )}
           
+            {ticketDetails.customerSignature && (
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Customer Signature:</Text>
-            <Text style={[styles.infoValue, styles.signatureText]}>[Signature]</Text>
+                <Text style={[styles.infoValue, styles.signatureText]}>
+                  {ticketDetails.customerSignature || '[Signature]'}
+                </Text>
           </View>
+            )}
           
+            {ticketDetails.signatureHolderName && (
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Signature Holder Name:</Text>
-            <Text style={styles.infoValue}>sunat</Text>
+                <Text style={styles.infoValue}>{ticketDetails.signatureHolderName}</Text>
           </View>
+            )}
           
+            {ticketDetails.signatureHolderDesignation && (
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Signature Holder Designation:</Text>
-            <Text style={styles.infoValue}>Building Owner</Text>
+                <Text style={styles.infoValue}>{ticketDetails.signatureHolderDesignation}</Text>
           </View>
+            )}
         </View>
       ),
     },
@@ -124,40 +510,58 @@ const TicketDetailsPage: React.FC = () => {
       isExpanded: false,
       content: (
         <View style={styles.ticketInfoContent}>
+            {ticketDetails.technicianRemark && (
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Technician Remark:</Text>
-            <Text style={styles.infoValue}>lift normal</Text>
+                <Text style={styles.infoValue}>{ticketDetails.technicianRemark}</Text>
           </View>
+            )}
           
+            {ticketDetails.closedBy && (
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Closed By:</Text>
-            <Text style={styles.infoValue}>Adhilakshmi</Text>
+                <Text style={styles.infoValue}>{ticketDetails.closedBy}</Text>
           </View>
+            )}
           
+            {ticketDetails.closeMode && (
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Close Mode:</Text>
-            <Text style={styles.infoValue}>by mobile app</Text>
+                <Text style={styles.infoValue}>{ticketDetails.closeMode}</Text>
           </View>
+            )}
           
+            {ticketDetails.technicianSignature && (
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Technician Signature:</Text>
-            <Text style={[styles.infoValue, styles.signatureText]}>[Signature]</Text>
+                <Text style={[styles.infoValue, styles.signatureText]}>
+                  {ticketDetails.technicianSignature || '[Signature]'}
+                </Text>
           </View>
+            )}
           
+            {ticketDetails.customerSignature && (
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Customer Signature:</Text>
-            <Text style={[styles.infoValue, styles.signatureText]}>[Signature]</Text>
+                <Text style={[styles.infoValue, styles.signatureText]}>
+                  {ticketDetails.customerSignature || '[Signature]'}
+                </Text>
           </View>
+            )}
           
+            {ticketDetails.signatureHolderName && (
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Signature Holder Name:</Text>
-            <Text style={styles.infoValue}>sunat</Text>
+                <Text style={styles.infoValue}>{ticketDetails.signatureHolderName}</Text>
           </View>
+            )}
           
+            {ticketDetails.signatureHolderDesignation && (
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Signature Holder Designation:</Text>
-            <Text style={styles.infoValue}>Building Owner</Text>
+                <Text style={styles.infoValue}>{ticketDetails.signatureHolderDesignation}</Text>
           </View>
+            )}
         </View>
       ),
     },
@@ -176,82 +580,60 @@ const TicketDetailsPage: React.FC = () => {
       isExpanded: false,
       content: (
         <View style={styles.ticketInfoContent}>
+            {ticketDetails.projectName && (
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>PROJECT NAME:</Text>
-            <Text style={styles.infoValue}>Test Site 1</Text>
+                <Text style={styles.infoValue}>{ticketDetails.projectName}</Text>
           </View>
+            )}
           
+            {ticketDetails.amcRef && (
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>AMC REF.:</Text>
-            <Text style={styles.infoValue}></Text>
+                <Text style={styles.infoValue}>{ticketDetails.amcRef}</Text>
           </View>
+            )}
           
+            {ticketDetails.amcType && (
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>AMC TYPE:</Text>
-            <Text style={styles.infoValue}></Text>
+                <Text style={styles.infoValue}>{ticketDetails.amcType}</Text>
           </View>
+            )}
           
+            {ticketDetails.amcStatus && (
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>AMC STATUS:</Text>
-            <Text style={styles.infoValue}></Text>
+                <Text style={styles.infoValue}>{ticketDetails.amcStatus}</Text>
           </View>
+            )}
           
+            {ticketDetails.amcExpiryDate && (
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>AMC EXPIRY DATE:</Text>
-            <Text style={[styles.infoValue, { color: '#4CAF50', fontWeight: 'bold' }]}>(Active)</Text>
+                <Text style={[styles.infoValue, { color: '#FF6B6B', fontWeight: 'bold' }]}>
+                  {ticketDetails.amcExpiryDate}{ticketDetails.amcStatus === 'Active' ? ' (Active)' : null}
+                </Text>
           </View>
+            )}
           
+            {ticketDetails.address && (
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Address:</Text>
             <View style={styles.addressRow}>
-              <Text style={[styles.infoValue, { color: '#2196F3' }]}>No 27 th road kaladipet</Text>
+                  <Text style={[styles.infoValue, { color: '#2196F3' }]}>{ticketDetails.address}</Text>
               <TouchableOpacity style={styles.mapButton} onPress={handleViewMap}>
                 <Text style={styles.mapIcon}>🔲</Text>
               </TouchableOpacity>
             </View>
           </View>
+            )}
         </View>
       ),
     },
-  ]);
+    ];
 
-  // Load ticket details on component mount
-  useEffect(() => {
-    loadTicketDetails();
-  }, []);
-
-  const loadTicketDetails = async () => {
-    try {
-      setIsLoading(true);
-      
-      // Use navigation data if available, otherwise load from API
-      if (navigationData) {
-        setTicketDetails(navigationData);
-      } else {
-        // Mock data - replace with actual API call
-        const mockTicketDetails: TicketDetails = {
-          id: '1',
-          ticketId: '679',
-          siteId: '988888',
-          siteName: 'Test Site 1',
-          address: 'No 27 th road kaladipet',
-          assignAt: '06:04 PM',
-          assignDate: '22/09/2025',
-          assignTo: 'Adhilakshmi;',
-          attendAt: '22/09/2025 06:14 pm',
-          attendBy: 'Adhilakshmi\nAdhilakshmi;',
-          duration: '0.06 Hours',
-          status: 'closed',
-          statusColor: '#4CAF50',
-        };
-        setTicketDetails(mockTicketDetails);
-      }
-    } catch (error) {
-      console.error('Error loading ticket details:', error);
-      setTicketDetails(null);
-    } finally {
-      setIsLoading(false);
-    }
+    setCollapsibleSections(sections);
   };
 
   const handleBack = () => {
@@ -283,7 +665,7 @@ const TicketDetailsPage: React.FC = () => {
   if (isLoading) {
     return (
       <View style={styles.container}>
-        <StatusBar barStyle="light-content" backgroundColor="#4CAF50" />
+        <StatusBar barStyle="light-content" backgroundColor="#FF6B6B" />
         
         {/* Header */}
         <View style={styles.header}>
@@ -309,7 +691,7 @@ const TicketDetailsPage: React.FC = () => {
   if (!ticketDetails) {
     return (
       <View style={styles.container}>
-        <StatusBar barStyle="light-content" backgroundColor="#4CAF50" />
+        <StatusBar barStyle="light-content" backgroundColor="#FF6B6B" />
         
         {/* Header */}
         <View style={styles.header}>
@@ -334,7 +716,7 @@ const TicketDetailsPage: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#4CAF50" />
+      <StatusBar barStyle="light-content" backgroundColor="#FF6B6B" />
       
       {/* Header */}
       <View style={styles.header}>
@@ -371,6 +753,7 @@ const TicketDetailsPage: React.FC = () => {
         </View>
 
         {/* Site Information Card */}
+        {(ticketDetails.siteId || ticketDetails.siteName || ticketDetails.address) && (
         <View style={styles.card}>
           <View style={styles.siteInfo}>
             <View style={styles.siteIconContainer}>
@@ -378,17 +761,20 @@ const TicketDetailsPage: React.FC = () => {
             </View>
             
             <View style={styles.siteDetails}>
-              <Text style={styles.siteId}>{ticketDetails.siteId}</Text>
-              <Text style={styles.siteName}>{ticketDetails.siteName}</Text>
+                <Text style={styles.siteId}>{ticketDetails.siteId || 'N/A'}</Text>
+                <Text style={styles.siteName}>{ticketDetails.siteName || 'Site name not available'}</Text>
+                {ticketDetails.address && (
               <View style={styles.addressContainer}>
                 <Text style={styles.address}>{ticketDetails.address}</Text>
                 <TouchableOpacity style={styles.mapButton} onPress={handleViewMap}>
                   <Text style={styles.mapIcon}>🔲</Text>
                 </TouchableOpacity>
               </View>
+                )}
             </View>
           </View>
         </View>
+        )}
 
         {/* Timeline and Status Card */}
         <View style={styles.card}>
@@ -399,14 +785,18 @@ const TicketDetailsPage: React.FC = () => {
               <View style={styles.timelineLeft}>
                 <View style={styles.timelineDot} />
                 <View style={styles.timelineContent}>
-                  <Text style={styles.timelineLabel}>Assign At: {ticketDetails.assignAt}</Text>
+                  <Text style={styles.timelineLabel}>
+                    Assign At: {ticketDetails.assignAt || 'Not assigned'}
+                  </Text>
+                  {ticketDetails.assignDate && (
                   <Text style={styles.timelineDate}>{ticketDetails.assignDate}</Text>
+                  )}
                 </View>
               </View>
               
               <View style={styles.timelineRight}>
                 <Text style={styles.timelineLabel}>Assign To:</Text>
-                <Text style={styles.timelineValue}>{ticketDetails.assignTo}</Text>
+                <Text style={styles.timelineValue}>{ticketDetails.assignTo || 'Not assigned'}</Text>
               </View>
             </View>
 
@@ -418,20 +808,24 @@ const TicketDetailsPage: React.FC = () => {
               <View style={styles.timelineLeft}>
                 <View style={styles.timelineDot} />
                 <View style={styles.timelineContent}>
-                  <Text style={styles.timelineLabel}>Attend At: {ticketDetails.attendAt}</Text>
+                  <Text style={styles.timelineLabel}>
+                    Attend At: {ticketDetails.attendAt || 'Not attended'}
+                  </Text>
                 </View>
               </View>
               
               <View style={styles.timelineRight}>
                 <Text style={styles.timelineLabel}>Attend By:</Text>
-                <Text style={styles.timelineValue}>{ticketDetails.attendBy}</Text>
+                <Text style={styles.timelineValue}>{ticketDetails.attendBy || 'Not attended'}</Text>
               </View>
             </View>
           </View>
 
           {/* Duration and Status */}
           <View style={styles.statusContainer}>
-            <Text style={styles.duration}>Duration: {ticketDetails.duration}</Text>
+            <Text style={styles.duration}>
+              Duration: {ticketDetails.duration || 'N/A'}
+            </Text>
             <Text style={[styles.status, { color: ticketDetails.statusColor }]}>
               ({ticketDetails.status})
             </Text>
@@ -475,7 +869,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5',
   },
   header: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#FF6B6B',
     paddingTop: Platform.OS === 'ios' ? 50 : 30,
     paddingBottom: 15,
     paddingHorizontal: 20,

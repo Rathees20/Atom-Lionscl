@@ -35,6 +35,7 @@ interface SideMenuProps {
   onNavigateToQuotation?: () => void;
   onNavigateToProfileSwitch?: () => void;
   onNavigateToAboutUs?: () => void;
+  onNavigateToCreateUser?: () => void;
 }
 
 const SideMenu: React.FC<SideMenuProps> = ({
@@ -50,6 +51,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
   onNavigateToQuotation,
   onNavigateToProfileSwitch,
   onNavigateToAboutUs,
+  onNavigateToCreateUser,
 }) => {
   const menuIcons: Record<string, ImageSourcePropType> = {
     bookComplaint: require('../assets/Book a complaint.png'),
@@ -151,6 +153,17 @@ const SideMenu: React.FC<SideMenuProps> = ({
           onNavigateToProfileSwitch();
         }
         onClose();
+      },
+    },
+    {
+      id: 'create-user',
+      title: 'Create User',
+      icon: menuIcons.switchProfile, // Using switch profile icon as placeholder
+      onPress: () => {
+        onClose();
+        if (onNavigateToCreateUser) {
+          onNavigateToCreateUser();
+        }
       },
     },
     {
@@ -267,7 +280,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   header: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#FF6B6B',
     paddingTop: Platform.OS === 'ios' ? 50 : 30,
     paddingBottom: 30,
     paddingHorizontal: 20,
@@ -378,13 +391,13 @@ const styles = StyleSheet.create({
   },
   footerCompany: {
     fontSize: 12,
-    color: '#4CAF50',
+    color: '#FF6B6B',
     fontWeight: '600',
     marginBottom: 5,
   },
   footerLink: {
     fontSize: 12,
-    color: '#4CAF50',
+    color: '#FF6B6B',
     textDecorationLine: 'underline',
   },
 });

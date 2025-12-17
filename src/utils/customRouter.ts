@@ -12,7 +12,8 @@ export type Route =
   | 'invoice'
   | 'quotation'
   | 'profile-switch'
-  | 'about-us';
+  | 'about-us'
+  | 'create-user';
 
 const ROUTE_STORAGE_KEY = 'atom-lionscl:current-route';
 
@@ -31,6 +32,7 @@ const isValidRoute = (value: string): value is Route => {
     'quotation',
     'profile-switch',
     'about-us',
+    'create-user',
   ].includes(value);
 };
 

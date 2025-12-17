@@ -13,6 +13,7 @@ import InvoicePage from '../screens/InvoicePage';
 import QuotationPage from '../screens/QuotationPage';
 import ProfileSwitchPage from '../screens/ProfileSwitchPage';
 import AboutUsPage from '../screens/AboutUsPage';
+import CreateUserPage from '../screens/CreateUserPage';
 
 // Routes that require authentication
 const PROTECTED_ROUTES = [
@@ -27,6 +28,7 @@ const PROTECTED_ROUTES = [
   'quotation',
   'profile-switch',
   'about-us',
+  'create-user',
 ];
 
 // Public routes that don't require authentication
@@ -85,6 +87,8 @@ const AppRouter: React.FC = () => {
         return <ProfileSwitchPage />;
       case 'about-us':
         return <AboutUsPage />;
+      case 'create-user':
+        return <CreateUserPage />;
       default:
         // If no user and default route, show login
         // Otherwise, try to restore to dashboard or last known route

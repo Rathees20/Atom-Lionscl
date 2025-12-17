@@ -30,14 +30,32 @@ interface AMCSummary {
   };
 }
 
+interface RoutineService {
+  lastService?: {
+    date: string;
+    duration: string;
+    technician: string;
+    code: string;
+  };
+  upcomingService?: {
+    date: string;
+    duration: string;
+    technician: string;
+    code: string;
+  };
+}
+
 const DashboardPage: React.FC = () => {
   const { user, setUser, navigateTo } = useNavigation();
   const [isMenuVisible, setIsMenuVisible] = useState(false);
   const [amcSummary, setAmcSummary] = useState<AMCSummary | null>(null);
   const [isLoadingAMC, setIsLoadingAMC] = useState(true);
+  const [routineService, setRoutineService] = useState<RoutineService | null>(null);
+  const [isLoadingRoutine, setIsLoadingRoutine] = useState(true);
 
   useEffect(() => {
     loadAMCData();
+    loadRoutineServices();
   }, []);
 
   const loadAMCData = async () => {
@@ -103,24 +121,241 @@ const DashboardPage: React.FC = () => {
     setIsMenuVisible(false);
   };
 
+  const handleLogout = async () => {
+    try {
+      const userEmail = user?.email;
+      
+      // Call logout API
+      if (userEmail) {
+        const url = `${API_ENDPOINTS.CUSTOMER_LOGOUT}?email=${encodeURIComponent(userEmail)}`;
+        console.log('Logging out:', url);
+        
+        try {
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          });
+
+          const data = await response.json();
+          console.log('Logout API Response:', data);
+          
+          // Continue with logout even if API call fails
+        } catch (error) {
+          console.error('Error calling logout API:', error);
+          // Continue with logout even if API call fails
+        }
+      }
+      
+      // Clear user and navigate to login
+      setUser(null);
+      navigateTo('/login');
+    } catch (error) {
+      console.error('Error during logout:', error);
+      // Still clear user and navigate to login even if there's an error
+      setUser(null);
+      navigateTo('/login');
+    }
+  };
+
+  const loadRoutineServices = async () => {
+    try {
+      setIsLoadingRoutine(true);
+      
+      const userEmail = user?.email;
+      if (!userEmail) {
+        setIsLoadingRoutine(false);
+        return;
+      }
+      
+      const url = `${API_ENDPOINTS.ROUTINE_SERVICES}?email=${encodeURIComponent(userEmail)}`;
+      console.log('Fetching routine services from:', url);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+      console.log('Routine services API Response:', JSON.stringify(data, null, 2));
+      console.log('Response keys:', Object.keys(data || {}));
+
+      if (response.ok) {
+        // Handle different response formats
+        let servicesData = data;
+        
+        if (Array.isArray(data)) {
+          // If array, use first item or combine data
+          servicesData = data.length > 0 ? data[0] : {};
+        } else if (data.services || data.routine_services || data.results) {
+          servicesData = data.services || data.routine_services || data.results;
+          if (Array.isArray(servicesData)) {
+            servicesData = servicesData.length > 0 ? servicesData[0] : {};
+          }
+        }
+        
+        console.log('Extracted servicesData:', JSON.stringify(servicesData, null, 2));
+        console.log('ServicesData keys:', Object.keys(servicesData || {}));
+        
+        // Extract last service data - check for nested objects or flat structure
+        const lastServiceData = servicesData.last_service || 
+                               servicesData.lastService || 
+                               servicesData.last || 
+                               servicesData;
+        
+        // Extract upcoming service data - check for nested objects or flat structure
+        const upcomingServiceData = servicesData.upcoming_service || 
+                                   servicesData.upcomingService || 
+                                   servicesData.upcoming || 
+                                   servicesData;
+        
+        // Map API response to RoutineService interface with comprehensive field checking
+        const routineService: RoutineService = {
+          lastService: {
+            date: lastServiceData.last_service_date || 
+                 lastServiceData.lastServiceDate || 
+                 lastServiceData.service_date ||
+                 lastServiceData.date ||
+                 lastServiceData.last_service ||
+                 lastServiceData.lastService ||
+                 servicesData.last_service_date ||
+                 servicesData.lastServiceDate ||
+                 '',
+            duration: lastServiceData.last_service_duration || 
+                     lastServiceData.lastServiceDuration || 
+                     lastServiceData.duration ||
+                     lastServiceData.service_duration ||
+                     servicesData.last_service_duration ||
+                     servicesData.lastServiceDuration ||
+                     '',
+            technician: lastServiceData.last_service_technician || 
+                      lastServiceData.lastServiceTechnician || 
+                      lastServiceData.technician ||
+                      lastServiceData.technician_name ||
+                      lastServiceData.technicianName ||
+                      lastServiceData.last_technician ||
+                      lastServiceData.last_technician_name ||
+                      servicesData.last_service_technician ||
+                      servicesData.lastServiceTechnician ||
+                      'Not assigned Yet',
+            code: lastServiceData.last_service_code || 
+                 lastServiceData.lastServiceCode || 
+                 lastServiceData.code ||
+                 lastServiceData.service_code ||
+                 servicesData.last_service_code ||
+                 servicesData.lastServiceCode ||
+                 'Nil',
+          },
+          upcomingService: {
+            date: upcomingServiceData.upcoming_service_date || 
+                 upcomingServiceData.upcomingServiceDate || 
+                 upcomingServiceData.service_date ||
+                 upcomingServiceData.date ||
+                 upcomingServiceData.upcoming_service ||
+                 upcomingServiceData.upcomingService ||
+                 servicesData.upcoming_service_date ||
+                 servicesData.upcomingServiceDate ||
+                 '',
+            duration: upcomingServiceData.upcoming_service_duration || 
+                     upcomingServiceData.upcomingServiceDuration || 
+                     upcomingServiceData.duration ||
+                     upcomingServiceData.service_duration ||
+                     servicesData.upcoming_service_duration ||
+                     servicesData.upcomingServiceDuration ||
+                     '',
+            technician: upcomingServiceData.upcoming_service_technician || 
+                      upcomingServiceData.upcomingServiceTechnician || 
+                      upcomingServiceData.technician ||
+                      upcomingServiceData.technician_name ||
+                      upcomingServiceData.technicianName ||
+                      upcomingServiceData.upcoming_technician ||
+                      upcomingServiceData.upcoming_technician_name ||
+                      servicesData.upcoming_service_technician ||
+                      servicesData.upcomingServiceTechnician ||
+                      'Not assigned',
+            code: upcomingServiceData.upcoming_service_code || 
+                 upcomingServiceData.upcomingServiceCode || 
+                 upcomingServiceData.code ||
+                 upcomingServiceData.service_code ||
+                 servicesData.upcoming_service_code ||
+                 servicesData.upcomingServiceCode ||
+                 '',
+          },
+        };
+        
+        console.log('Mapped routine service:', JSON.stringify(routineService, null, 2));
+        setRoutineService(routineService);
+      }
+    } catch (error) {
+      console.error('Error loading routine services:', error);
+    } finally {
+      setIsLoadingRoutine(false);
+    }
+  };
+
   const handleDownloadServiceSlip = () => {
     // Handle download service slip
     console.log('Download service slip');
   };
 
+  // Helper function to format date
+  const formatServiceDate = (dateString: string): string => {
+    if (!dateString || dateString === 'N/A' || dateString === '') return 'N/A';
+    
+    try {
+      // Handle different date formats
+      let date: Date;
+      
+      // If it's already in DD/MM/YYYY format, return as is
+      if (typeof dateString === 'string' && /^\d{2}\/\d{2}\/\d{4}$/.test(dateString)) {
+        return dateString;
+      }
+      
+      // Try parsing as ISO date string
+      date = new Date(dateString);
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        // Try parsing as other formats
+        const parts = dateString.split(/[-/]/);
+        if (parts.length === 3) {
+          // Try YYYY-MM-DD or DD-MM-YYYY
+          if (parts[0].length === 4) {
+            date = new Date(`${parts[0]}-${parts[1]}-${parts[2]}`);
+          } else {
+            date = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+          }
+        }
+        
+        // If still invalid, return original string
+        if (isNaN(date.getTime())) {
+          return dateString;
+        }
+      }
+      
+      const day = date.getDate().toString().padStart(2, '0');
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
+    } catch (error) {
+      console.error('Error formatting date:', dateString, error);
+      return dateString || 'N/A';
+    }
+  };
+
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#4CAF50" />
+      <StatusBar barStyle="light-content" backgroundColor="#FF6B6B" />
       
       {/* Side Menu */}
       <SideMenu
         visible={isMenuVisible}
         onClose={handleCloseMenu}
         userData={user}
-        onLogout={() => {
-          setUser(null);
-          navigateTo('/login');
-        }}
+        onLogout={handleLogout}
         onNavigateToAddComplaint={() => navigateTo('/add-complaint')}
         onNavigateToComplaints={() => navigateTo('/complaints')}
         onNavigateToRoutineMaintenance={() => navigateTo('/routine-maintenance')}
@@ -129,6 +364,7 @@ const DashboardPage: React.FC = () => {
         onNavigateToQuotation={() => navigateTo('/quotation')}
         onNavigateToProfileSwitch={() => navigateTo('/profile-switch')}
         onNavigateToAboutUs={() => navigateTo('/about-us')}
+        onNavigateToCreateUser={() => navigateTo('/create-user')}
       />
       
       {/* Blue Header */}
@@ -258,7 +494,7 @@ const DashboardPage: React.FC = () => {
               
               <View style={styles.amcSummaryItem}>
                 <Text style={styles.amcSummaryLabel}>Active Contracts</Text>
-                <Text style={[styles.amcSummaryValue, { color: '#4CAF50' }]}>
+                <Text style={[styles.amcSummaryValue, { color: '#FF6B6B' }]}>
                   {amcSummary.activeContracts}
                 </Text>
               </View>
@@ -274,7 +510,7 @@ const DashboardPage: React.FC = () => {
               
               <View style={styles.amcFinancialItem}>
                 <Text style={styles.amcFinancialLabel}>Paid Amount</Text>
-                <Text style={[styles.amcFinancialValue, { color: '#4CAF50' }]}>
+                <Text style={[styles.amcFinancialValue, { color: '#FF6B6B' }]}>
                   ₹{amcSummary.paidAmount.toFixed(2)}
                 </Text>
               </View>
@@ -341,68 +577,106 @@ const DashboardPage: React.FC = () => {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>ROUTINE SERVICES</Text>
           
-          <View style={styles.servicesContainer}>
-            {/* Last Service Section */}
-            <View style={styles.serviceSection}>
-              <Text style={styles.serviceSectionTitle}>Last Service</Text>
-              
-              <View style={styles.serviceInfo}>
-                <Text style={styles.serviceLabel}>Last Service :</Text>
-                <Text style={styles.serviceValue}>01/01/1970</Text>
-              </View>
-              
-              <View style={styles.serviceInfo}>
-                <Text style={styles.serviceLabel}>Duration :</Text>
-                <Text style={styles.serviceValue}></Text>
-              </View>
-              
-              <View style={styles.serviceInfo}>
-                <Text style={styles.serviceLabel}>Technician :</Text>
-                <Text style={styles.serviceValue}>Not assigned Yet</Text>
-              </View>
-              
-              <View style={styles.serviceInfo}>
-                <Text style={styles.serviceLabel}>Code :</Text>
-                <Text style={styles.serviceValue}>Nil</Text>
-              </View>
-              
-              <TouchableOpacity 
-                style={styles.downloadButton}
-                onPress={handleDownloadServiceSlip}
-              >
-                <Text style={styles.downloadIcon}>⬇</Text>
-                <Text style={styles.downloadText}>Download Service Slip</Text>
-              </TouchableOpacity>
+          {isLoadingRoutine ? (
+            <View style={styles.loadingContainer}>
+              <Text style={styles.loadingText}>Loading routine services...</Text>
             </View>
+          ) : (
+            <View style={styles.servicesContainer}>
+              {/* Last Service Section */}
+              <View style={styles.serviceSection}>
+                <Text style={styles.serviceSectionTitle}>Last Service</Text>
+                
+                <View style={styles.serviceInfo}>
+                  <Text style={styles.serviceLabel}>Last Service :</Text>
+                  <Text style={styles.serviceValue}>
+                    {routineService?.lastService?.date && routineService.lastService.date.trim() !== '' 
+                      ? formatServiceDate(routineService.lastService.date) 
+                      : 'N/A'}
+                  </Text>
+                </View>
+                
+                <View style={styles.serviceInfo}>
+                  <Text style={styles.serviceLabel}>Duration :</Text>
+                  <Text style={styles.serviceValue}>
+                    {routineService?.lastService?.duration && routineService.lastService.duration.trim() !== '' 
+                      ? routineService.lastService.duration 
+                      : 'N/A'}
+                  </Text>
+                </View>
+                
+                <View style={styles.serviceInfo}>
+                  <Text style={styles.serviceLabel}>Technician :</Text>
+                  <Text style={styles.serviceValue}>
+                    {routineService?.lastService?.technician && routineService.lastService.technician.trim() !== '' 
+                      ? routineService.lastService.technician 
+                      : 'Not assigned Yet'}
+                  </Text>
+                </View>
+                
+                <View style={styles.serviceInfo}>
+                  <Text style={styles.serviceLabel}>Code :</Text>
+                  <Text style={styles.serviceValue}>
+                    {routineService?.lastService?.code && routineService.lastService.code.trim() !== '' 
+                      ? routineService.lastService.code 
+                      : 'Nil'}
+                  </Text>
+                </View>
+                
+                <TouchableOpacity 
+                  style={styles.downloadButton}
+                  onPress={handleDownloadServiceSlip}
+                >
+                  <Text style={styles.downloadIcon}>⬇</Text>
+                  <Text style={styles.downloadText}>Download Service Slip</Text>
+                </TouchableOpacity>
+              </View>
 
-            {/* Divider */}
-            <View style={styles.divider} />
+              {/* Divider */}
+              <View style={styles.divider} />
 
-            {/* Upcoming Service Section */}
-            <View style={styles.serviceSection}>
-              <Text style={styles.serviceSectionTitle}>Upcoming Service</Text>
-              
-              <View style={styles.serviceInfo}>
-                <Text style={styles.serviceLabel}>Upcoming Service :</Text>
-                <Text style={styles.serviceValue}>2024-09-11</Text>
-              </View>
-              
-              <View style={styles.serviceInfo}>
-                <Text style={styles.serviceLabel}>Duration :</Text>
-                <Text style={styles.serviceValue}>in 397 Days</Text>
-              </View>
-              
-              <View style={styles.serviceInfo}>
-                <Text style={styles.serviceLabel}>Technician :</Text>
-                <Text style={styles.serviceValue}>soundahr</Text>
-              </View>
-              
-              <View style={styles.serviceInfo}>
-                <Text style={styles.serviceLabel}>Code :</Text>
-                <Text style={styles.serviceValue}></Text>
+              {/* Upcoming Service Section */}
+              <View style={styles.serviceSection}>
+                <Text style={styles.serviceSectionTitle}>Upcoming Service</Text>
+                
+                <View style={styles.serviceInfo}>
+                  <Text style={styles.serviceLabel}>Upcoming Service :</Text>
+                  <Text style={styles.serviceValue}>
+                    {routineService?.upcomingService?.date && routineService.upcomingService.date.trim() !== '' 
+                      ? formatServiceDate(routineService.upcomingService.date) 
+                      : 'N/A'}
+                  </Text>
+                </View>
+                
+                <View style={styles.serviceInfo}>
+                  <Text style={styles.serviceLabel}>Duration :</Text>
+                  <Text style={styles.serviceValue}>
+                    {routineService?.upcomingService?.duration && routineService.upcomingService.duration.trim() !== '' 
+                      ? routineService.upcomingService.duration 
+                      : 'N/A'}
+                  </Text>
+                </View>
+                
+                <View style={styles.serviceInfo}>
+                  <Text style={styles.serviceLabel}>Technician :</Text>
+                  <Text style={styles.serviceValue}>
+                    {routineService?.upcomingService?.technician && routineService.upcomingService.technician.trim() !== '' 
+                      ? routineService.upcomingService.technician 
+                      : 'Not assigned'}
+                  </Text>
+                </View>
+                
+                <View style={styles.serviceInfo}>
+                  <Text style={styles.serviceLabel}>Code :</Text>
+                  <Text style={styles.serviceValue}>
+                    {routineService?.upcomingService?.code && routineService.upcomingService.code.trim() !== '' 
+                      ? routineService.upcomingService.code 
+                      : 'N/A'}
+                  </Text>
+                </View>
               </View>
             </View>
-          </View>
+          )}
         </View>
       </ScrollView>
 
@@ -416,7 +690,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5',
   },
   header: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#FF6B6B',
     paddingTop: Platform.OS === 'ios' ? 50 : 30,
     paddingBottom: 15,
     paddingHorizontal: 20,
@@ -637,7 +911,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   viewAllButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#FF6B6B',
     borderRadius: 8,
     paddingVertical: 12,
     paddingHorizontal: 20,
@@ -648,6 +922,14 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
+  },
+  loadingContainer: {
+    paddingVertical: 20,
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#666666',
   },
 });
 

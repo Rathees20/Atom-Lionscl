@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,8 +9,10 @@ import {
   ScrollView,
   StatusBar,
   Image,
+  Alert,
 } from 'react-native';
 import { useNavigation } from '../contexts/NavigationContext';
+import { API_ENDPOINTS } from '../utils/api';
 
 const { width, height } = Dimensions.get('window');
 const isWeb = Platform.OS === 'web';
@@ -35,12 +37,10 @@ interface MaintenanceDetailsPageProps {
 }
 
 const MaintenanceDetailsPage: React.FC<MaintenanceDetailsPageProps> = ({ maintenanceItem }) => {
-  const { navigateTo, navigationData, clearNavigationData } = useNavigation();
+  const { navigateTo, navigationData, clearNavigationData, user } = useNavigation();
   const [isRoutineServiceExpanded, setIsRoutineServiceExpanded] = useState(false);
   const [isMaterialInfoExpanded, setIsMaterialInfoExpanded] = useState(false);
-
-  // Use passed data, navigation data, or show empty state
-  const maintenanceDetails: MaintenanceDetails = maintenanceItem || navigationData || {
+  const [maintenanceDetails, setMaintenanceDetails] = useState<MaintenanceDetails>(maintenanceItem || navigationData || {
     id: '',
     amcRef: '',
     siteId: '',
@@ -53,6 +53,139 @@ const MaintenanceDetailsPage: React.FC<MaintenanceDetailsPageProps> = ({ mainten
     blockWing: '',
     attendAt: '',
     attendBy: '',
+  });
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load maintenance details from API
+  useEffect(() => {
+    loadMaintenanceDetails();
+  }, [navigationData?.id]);
+
+  const loadMaintenanceDetails = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Get maintenance ID from navigation data
+      const maintenanceId = navigationData?.id || maintenanceItem?.id;
+      
+      if (!maintenanceId) {
+        setIsLoading(false);
+        return;
+      }
+
+      const userEmail = user?.email;
+      if (!userEmail) {
+        Alert.alert('Error', 'User email not found. Please login again.');
+        setIsLoading(false);
+        return;
+      }
+
+      // Fetch all services and find the matching one
+      const url = `${API_ENDPOINTS.ROUTINE_SERVICES_ALL}?email=${encodeURIComponent(userEmail)}`;
+      console.log('Fetching maintenance details from:', url);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+      console.log('Maintenance details API Response:', JSON.stringify(data, null, 2));
+
+      if (response.ok) {
+        // Handle different response formats
+        let servicesArray: any[] = [];
+        
+        if (Array.isArray(data)) {
+          servicesArray = data;
+        } else if (data.services || data.routine_services || data.results) {
+          servicesArray = data.services || data.routine_services || data.results;
+          if (!Array.isArray(servicesArray)) {
+            servicesArray = [];
+          }
+        }
+        
+        // Find the matching service by ID
+        const serviceData = servicesArray.find((item: any) => {
+          const itemId = item.id?.toString() || 
+                        item.service_id?.toString() || 
+                        item.maintenance_id?.toString() || 
+                        '';
+          return itemId === maintenanceId.toString();
+        });
+        
+        if (serviceData) {
+          // Map API response to MaintenanceDetails interface
+          const details: MaintenanceDetails = {
+            id: serviceData.id?.toString() || maintenanceId,
+            amcRef: serviceData.amc_ref || 
+                   serviceData.amcRef || 
+                   serviceData.amc_reference ||
+                   serviceData.amc?.reference ||
+                   '',
+            siteId: serviceData.site_id?.toString() || 
+                   serviceData.siteId?.toString() || 
+                   serviceData.site?.id?.toString() ||
+                   '',
+            siteName: serviceData.site_name || 
+                     serviceData.siteName || 
+                     serviceData.site?.name ||
+                     serviceData.project_name ||
+                     '',
+            siteAddress: serviceData.site_address || 
+                        serviceData.siteAddress || 
+                        serviceData.address ||
+                        serviceData.site?.address ||
+                        '',
+            serviceDate: serviceData.service_date || 
+                       serviceData.serviceDate || 
+                       serviceData.date ||
+                       serviceData.scheduled_date ||
+                       '',
+            month: serviceData.month || 
+                  serviceData.service_month ||
+                  serviceData.serviceMonth ||
+                  '',
+            siteCity: serviceData.site_city || 
+                     serviceData.siteCity || 
+                     serviceData.city ||
+                     serviceData.site?.city ||
+                     '',
+            status: serviceData.status || 'all',
+            blockWing: serviceData.block_wing || 
+                      serviceData.blockWing || 
+                      serviceData.block ||
+                      '',
+            attendAt: serviceData.attend_at || 
+                     serviceData.attendAt || 
+                     serviceData.attended_at ||
+                     '',
+            attendBy: serviceData.attend_by || 
+                     serviceData.attendBy || 
+                     serviceData.technician ||
+                     serviceData.technician_name ||
+                     '',
+          };
+          
+          setMaintenanceDetails(details);
+        } else {
+          // Use navigation data if API doesn't have the item
+          if (navigationData) {
+            setMaintenanceDetails(navigationData);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error loading maintenance details:', error);
+      // Use navigation data as fallback
+      if (navigationData) {
+        setMaintenanceDetails(navigationData);
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleBack = () => {
@@ -92,7 +225,7 @@ const MaintenanceDetailsPage: React.FC<MaintenanceDetailsPageProps> = ({ mainten
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed':
-        return '#4CAF50';
+        return '#FF6B6B';
       case 'due':
         return '#FF9800';
       case 'overdue':
@@ -106,7 +239,7 @@ const MaintenanceDetailsPage: React.FC<MaintenanceDetailsPageProps> = ({ mainten
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#4CAF50" />
+      <StatusBar barStyle="light-content" backgroundColor="#FF6B6B" />
       
       {/* Header */}
       <View style={styles.header}>
@@ -123,8 +256,14 @@ const MaintenanceDetailsPage: React.FC<MaintenanceDetailsPageProps> = ({ mainten
 
       {/* Main Content */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* AMC Reference Section */}
-        <View style={styles.amcSection}>
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <Text style={styles.loadingText}>Loading maintenance details...</Text>
+          </View>
+        ) : (
+          <>
+            {/* AMC Reference Section */}
+            <View style={styles.amcSection}>
           <View style={styles.amcLeft}>
             <Text style={styles.amcLabel}>AMC Ref.</Text>
             <Text style={styles.amcValue}>{maintenanceDetails.amcRef || 'N/A'}</Text>
@@ -250,6 +389,8 @@ const MaintenanceDetailsPage: React.FC<MaintenanceDetailsPageProps> = ({ mainten
             </View>
           )}
         </View>
+          </>
+        )}
       </ScrollView>
     </View>
   );
@@ -261,7 +402,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5',
   },
   header: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#FF6B6B',
     paddingTop: Platform.OS === 'ios' ? 50 : 30,
     paddingBottom: 15,
     paddingHorizontal: 20,
@@ -374,7 +515,7 @@ const styles = StyleSheet.create({
   },
   addressText: {
     fontSize: 14,
-    color: '#4CAF50',
+    color: '#FF6B6B',
     flex: 1,
   },
   externalLinkIcon: {
@@ -547,6 +688,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666666',
     lineHeight: 20,
+  },
+  loadingContainer: {
+    paddingVertical: 50,
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#666666',
   },
 });
 
