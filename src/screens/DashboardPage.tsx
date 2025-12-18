@@ -32,12 +32,14 @@ interface AMCSummary {
 
 interface RoutineService {
   lastService?: {
+    id?: string;
     date: string;
     duration: string;
     technician: string;
     code: string;
   };
   upcomingService?: {
+    id?: string;
     date: string;
     duration: string;
     technician: string;
@@ -58,18 +60,35 @@ const DashboardPage: React.FC = () => {
     loadRoutineServices();
   }, []);
 
+  // Helper function to safely get string values
+  const safeGetString = (value: any): string => {
+    if (value === null || value === undefined) return 'N/A';
+    if (typeof value === 'object') return JSON.stringify(value);
+    return String(value);
+  };
+
+  // Helper function to safely get number values
+  const safeGetNumber = (value: any): number => {
+    if (value === null || value === undefined) return 0;
+    if (typeof value === 'object') return 0;
+    const num = parseFloat(String(value));
+    return isNaN(num) ? 0 : num;
+  };
+
   const loadAMCData = async () => {
     try {
       setIsLoadingAMC(true);
-      
+
       const userEmail = user?.email;
       if (!userEmail) {
         setIsLoadingAMC(false);
         return;
       }
-      
+
       const url = `${API_ENDPOINTS.CUSTOMER_AMCS}?email=${encodeURIComponent(userEmail)}`;
-      
+
+      console.log('Fetching AMC data from:', url);
+
       const response = await fetch(url, {
         method: 'GET',
         headers: {
@@ -79,32 +98,75 @@ const DashboardPage: React.FC = () => {
 
       const data = await response.json();
 
+      console.log('AMC API response:', data);
+
       if (response.ok) {
-        const amcs = Array.isArray(data) ? data : (data.amcs || data.contracts || data.results || []);
-        
+        // Handle different response formats
+        let amcsData = [];
+
+        if (Array.isArray(data)) {
+          amcsData = data;
+        } else if (data.amcs) {
+          amcsData = data.amcs;
+        } else if (data.contracts) {
+          amcsData = data.contracts;
+        } else if (data.results) {
+          amcsData = data.results;
+        } else if (data.data) {
+          amcsData = data.data;
+        } else {
+          // If none of the above, treat the whole response as a single contract
+          amcsData = [data];
+        }
+
+        console.log('Processing AMC data:', amcsData);
+
         const summary: AMCSummary = {
-          totalContracts: amcs.length,
-          activeContracts: amcs.filter((item: any) => 
-            (item.status || '').toLowerCase() === 'active'
+          totalContracts: amcsData.length,
+          activeContracts: amcsData.filter((item: any) =>
+            (safeGetString(item.status).toLowerCase() === 'active')
           ).length,
-          totalAmount: amcs.reduce((sum: number, item: any) => 
-            sum + (parseFloat(item.contract_amount || item.contractAmount || '0') || 0), 0
+          totalAmount: amcsData.reduce((sum: number, item: any) =>
+            sum + safeGetNumber(item.contract_amount || item.contractAmount || item.amount || item.total), 0
           ),
-          paidAmount: amcs.reduce((sum: number, item: any) => 
-            sum + (parseFloat(item.paid_amount || item.paidAmount || '0') || 0), 0
+          paidAmount: amcsData.reduce((sum: number, item: any) =>
+            sum + safeGetNumber(item.paid_amount || item.paidAmount || item.paid), 0
           ),
-          dueAmount: amcs.reduce((sum: number, item: any) => 
-            sum + (parseFloat(item.due_amount || item.dueAmount || '0') || 0), 0
+          dueAmount: amcsData.reduce((sum: number, item: any) =>
+            sum + safeGetNumber(item.due_amount || item.dueAmount || item.due), 0
           ),
-          latestContract: amcs.length > 0 ? {
-            contractId: amcs[0].contract_id || amcs[0].contractId || amcs[0].amc_id?.toString() || 'N/A',
-            status: amcs[0].status || 'N/A',
-            period: amcs[0].period || amcs[0].contract_period || 
-              (amcs[0].start_date && amcs[0].end_date ? `${amcs[0].start_date} - ${amcs[0].end_date}` : 'N/A'),
-          } : undefined,
+          latestContract: (() => {
+            // Find the most recent contract based on date or ID
+            if (amcsData.length === 0) return undefined;
+
+            // Try to find a contract with a valid date or ID
+            const validContracts = amcsData.filter((item: any) =>
+              (item.start_date || item.startDate || item.created_at || item.createdAt || item.id)
+            );
+
+            if (validContracts.length > 0) {
+              // For now, just take the first valid contract
+              // In a real app, you might sort by date
+              const latest = validContracts[0];
+              return {
+                contractId: safeGetString(latest.contract_id || latest.contractId || latest.amc_id || latest.id || 'N/A'),
+                status: safeGetString(latest.status || 'N/A'),
+                period: safeGetString(latest.period || latest.contract_period || latest.Period ||
+                  (latest.start_date && latest.end_date ?
+                    `${safeGetString(latest.start_date)} - ${safeGetString(latest.end_date)}` :
+                    (latest.startDate && latest.endDate ?
+                      `${safeGetString(latest.startDate)} - ${safeGetString(latest.endDate)}` : 'N/A'))),
+              };
+            }
+
+            return undefined;
+          })(),
         };
-        
+
+        console.log('AMC Summary:', summary);
         setAmcSummary(summary);
+      } else {
+        console.error('Error loading AMC data:', data.error || data.message || response.statusText);
       }
     } catch (error) {
       console.error('Error loading AMC data:', error);
@@ -112,6 +174,7 @@ const DashboardPage: React.FC = () => {
       setIsLoadingAMC(false);
     }
   };
+
 
   const handleMenuPress = () => {
     setIsMenuVisible(true);
@@ -124,12 +187,12 @@ const DashboardPage: React.FC = () => {
   const handleLogout = async () => {
     try {
       const userEmail = user?.email;
-      
+
       // Call logout API
       if (userEmail) {
         const url = `${API_ENDPOINTS.CUSTOMER_LOGOUT}?email=${encodeURIComponent(userEmail)}`;
         console.log('Logging out:', url);
-        
+
         try {
           const response = await fetch(url, {
             method: 'POST',
@@ -140,14 +203,14 @@ const DashboardPage: React.FC = () => {
 
           const data = await response.json();
           console.log('Logout API Response:', data);
-          
+
           // Continue with logout even if API call fails
         } catch (error) {
           console.error('Error calling logout API:', error);
           // Continue with logout even if API call fails
         }
       }
-      
+
       // Clear user and navigate to login
       setUser(null);
       navigateTo('/login');
@@ -162,16 +225,16 @@ const DashboardPage: React.FC = () => {
   const loadRoutineServices = async () => {
     try {
       setIsLoadingRoutine(true);
-      
+
       const userEmail = user?.email;
       if (!userEmail) {
         setIsLoadingRoutine(false);
         return;
       }
-      
+
       const url = `${API_ENDPOINTS.ROUTINE_SERVICES}?email=${encodeURIComponent(userEmail)}`;
       console.log('Fetching routine services from:', url);
-      
+
       const response = await fetch(url, {
         method: 'GET',
         headers: {
@@ -186,7 +249,7 @@ const DashboardPage: React.FC = () => {
       if (response.ok) {
         // Handle different response formats
         let servicesData = data;
-        
+
         if (Array.isArray(data)) {
           // If array, use first item or combine data
           servicesData = data.length > 0 ? data[0] : {};
@@ -196,96 +259,98 @@ const DashboardPage: React.FC = () => {
             servicesData = servicesData.length > 0 ? servicesData[0] : {};
           }
         }
-        
+
         console.log('Extracted servicesData:', JSON.stringify(servicesData, null, 2));
         console.log('ServicesData keys:', Object.keys(servicesData || {}));
-        
+
         // Extract last service data - check for nested objects or flat structure
-        const lastServiceData = servicesData.last_service || 
-                               servicesData.lastService || 
-                               servicesData.last || 
-                               servicesData;
-        
+        const lastServiceData = servicesData.last_service ||
+          servicesData.lastService ||
+          servicesData.last ||
+          servicesData;
+
         // Extract upcoming service data - check for nested objects or flat structure
-        const upcomingServiceData = servicesData.upcoming_service || 
-                                   servicesData.upcomingService || 
-                                   servicesData.upcoming || 
-                                   servicesData;
-        
+        const upcomingServiceData = servicesData.upcoming_service ||
+          servicesData.upcomingService ||
+          servicesData.upcoming ||
+          servicesData;
+
         // Map API response to RoutineService interface with comprehensive field checking
         const routineService: RoutineService = {
           lastService: {
-            date: lastServiceData.last_service_date || 
-                 lastServiceData.lastServiceDate || 
-                 lastServiceData.service_date ||
-                 lastServiceData.date ||
-                 lastServiceData.last_service ||
-                 lastServiceData.lastService ||
-                 servicesData.last_service_date ||
-                 servicesData.lastServiceDate ||
-                 '',
-            duration: lastServiceData.last_service_duration || 
-                     lastServiceData.lastServiceDuration || 
-                     lastServiceData.duration ||
-                     lastServiceData.service_duration ||
-                     servicesData.last_service_duration ||
-                     servicesData.lastServiceDuration ||
-                     '',
-            technician: lastServiceData.last_service_technician || 
-                      lastServiceData.lastServiceTechnician || 
-                      lastServiceData.technician ||
-                      lastServiceData.technician_name ||
-                      lastServiceData.technicianName ||
-                      lastServiceData.last_technician ||
-                      lastServiceData.last_technician_name ||
-                      servicesData.last_service_technician ||
-                      servicesData.lastServiceTechnician ||
-                      'Not assigned Yet',
-            code: lastServiceData.last_service_code || 
-                 lastServiceData.lastServiceCode || 
-                 lastServiceData.code ||
-                 lastServiceData.service_code ||
-                 servicesData.last_service_code ||
-                 servicesData.lastServiceCode ||
-                 'Nil',
+            id: lastServiceData.id || lastServiceData.service_id || lastServiceData.serviceId || servicesData.id || servicesData.service_id || servicesData.serviceId,
+            date: lastServiceData.last_service_date ||
+              lastServiceData.lastServiceDate ||
+              lastServiceData.service_date ||
+              lastServiceData.date ||
+              lastServiceData.last_service ||
+              lastServiceData.lastService ||
+              servicesData.last_service_date ||
+              servicesData.lastServiceDate ||
+              '',
+            duration: lastServiceData.last_service_duration ||
+              lastServiceData.lastServiceDuration ||
+              lastServiceData.duration ||
+              lastServiceData.service_duration ||
+              servicesData.last_service_duration ||
+              servicesData.lastServiceDuration ||
+              '',
+            technician: lastServiceData.last_service_technician ||
+              lastServiceData.lastServiceTechnician ||
+              lastServiceData.technician ||
+              lastServiceData.technician_name ||
+              lastServiceData.technicianName ||
+              lastServiceData.last_technician ||
+              lastServiceData.last_technician_name ||
+              servicesData.last_service_technician ||
+              servicesData.lastServiceTechnician ||
+              'Not assigned Yet',
+            code: lastServiceData.last_service_code ||
+              lastServiceData.lastServiceCode ||
+              lastServiceData.code ||
+              lastServiceData.service_code ||
+              servicesData.last_service_code ||
+              servicesData.lastServiceCode ||
+              'Nil',
           },
           upcomingService: {
-            date: upcomingServiceData.upcoming_service_date || 
-                 upcomingServiceData.upcomingServiceDate || 
-                 upcomingServiceData.service_date ||
-                 upcomingServiceData.date ||
-                 upcomingServiceData.upcoming_service ||
-                 upcomingServiceData.upcomingService ||
-                 servicesData.upcoming_service_date ||
-                 servicesData.upcomingServiceDate ||
-                 '',
-            duration: upcomingServiceData.upcoming_service_duration || 
-                     upcomingServiceData.upcomingServiceDuration || 
-                     upcomingServiceData.duration ||
-                     upcomingServiceData.service_duration ||
-                     servicesData.upcoming_service_duration ||
-                     servicesData.upcomingServiceDuration ||
-                     '',
-            technician: upcomingServiceData.upcoming_service_technician || 
-                      upcomingServiceData.upcomingServiceTechnician || 
-                      upcomingServiceData.technician ||
-                      upcomingServiceData.technician_name ||
-                      upcomingServiceData.technicianName ||
-                      upcomingServiceData.upcoming_technician ||
-                      upcomingServiceData.upcoming_technician_name ||
-                      servicesData.upcoming_service_technician ||
-                      servicesData.upcomingServiceTechnician ||
-                      'Not assigned',
-            code: upcomingServiceData.upcoming_service_code || 
-                 upcomingServiceData.upcomingServiceCode || 
-                 upcomingServiceData.code ||
-                 upcomingServiceData.service_code ||
-                 servicesData.upcoming_service_code ||
-                 servicesData.upcomingServiceCode ||
-                 '',
+            id: upcomingServiceData.id || upcomingServiceData.service_id || upcomingServiceData.serviceId || servicesData.id || servicesData.service_id || servicesData.serviceId,
+            date: upcomingServiceData.upcoming_service_date ||
+              upcomingServiceData.upcomingServiceDate ||
+              upcomingServiceData.service_date ||
+              upcomingServiceData.date ||
+              upcomingServiceData.upcoming_service ||
+              upcomingServiceData.upcomingService ||
+              servicesData.upcoming_service_date ||
+              servicesData.upcomingServiceDate ||
+              '',
+            duration: upcomingServiceData.upcoming_service_duration ||
+              upcomingServiceData.upcomingServiceDuration ||
+              upcomingServiceData.duration ||
+              upcomingServiceData.service_duration ||
+              servicesData.upcoming_service_duration ||
+              servicesData.upcomingServiceDuration ||
+              '',
+            technician: upcomingServiceData.upcoming_service_technician ||
+              upcomingServiceData.upcomingServiceTechnician ||
+              upcomingServiceData.technician ||
+              upcomingServiceData.technician_name ||
+              upcomingServiceData.technicianName ||
+              upcomingServiceData.upcoming_technician ||
+              upcomingServiceData.upcoming_technician_name ||
+              servicesData.upcoming_service_technician ||
+              servicesData.upcomingServiceTechnician ||
+              'Not assigned',
+            code: upcomingServiceData.upcoming_service_code ||
+              upcomingServiceData.upcomingServiceCode ||
+              upcomingServiceData.code ||
+              upcomingServiceData.service_code ||
+              servicesData.upcoming_service_code ||
+              servicesData.upcomingServiceCode ||
+              '',
           },
         };
-        
+
         console.log('Mapped routine service:', JSON.stringify(routineService, null, 2));
         setRoutineService(routineService);
       }
@@ -296,27 +361,83 @@ const DashboardPage: React.FC = () => {
     }
   };
 
-  const handleDownloadServiceSlip = () => {
-    // Handle download service slip
-    console.log('Download service slip');
+  const handleDownloadServiceSlip = async () => {
+    try {
+      // Check if there's a last service with a valid date
+      const lastServiceDate = routineService?.lastService?.date;
+      const lastServiceId = routineService?.lastService?.id;
+
+      if (!lastServiceDate || lastServiceDate === 'N/A' || lastServiceDate.trim() === '') {
+        Alert.alert('No Completed Services', 'There are no completed routine services to download.');
+        return;
+      }
+
+      if (!lastServiceId || lastServiceId === 'N/A' || lastServiceId.trim() === '') {
+        Alert.alert('Error', 'Service ID not found. Cannot download service slip.');
+        return;
+      }
+
+      const userEmail = user?.email;
+      if (!userEmail) {
+        Alert.alert('Error', 'User information not found. Please login again.');
+        return;
+      }
+
+      // Show loading indicator
+      setIsLoadingRoutine(true);
+
+      // Make API call to download service slip for completed services only
+      const url = `${API_ENDPOINTS.ROUTINE_SERVICES_DOWNLOAD_SLIP}?email=${encodeURIComponent(userEmail)}&service_id=${encodeURIComponent(lastServiceId)}`;
+
+      console.log('Downloading service slip from:', url);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/pdf',
+        },
+      });
+
+      if (response.ok) {
+        // For React Native, we'll show a success message
+        // In a real implementation, you might want to use a library like react-native-fs
+        // to save the file to the device
+        Alert.alert(
+          'Download Ready',
+          'Service slip is ready for download. In a mobile app, this would be saved to your device.',
+          [
+            { text: 'OK' }
+          ]
+        );
+      } else {
+        const errorText = await response.text();
+        console.error('Error downloading service slip:', errorText);
+        Alert.alert('Error', 'Failed to download service slip. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error downloading service slip:', error);
+      Alert.alert('Error', 'An error occurred while downloading the service slip. Please try again.');
+    } finally {
+      setIsLoadingRoutine(false);
+    }
   };
 
   // Helper function to format date
   const formatServiceDate = (dateString: string): string => {
     if (!dateString || dateString === 'N/A' || dateString === '') return 'N/A';
-    
+
     try {
       // Handle different date formats
       let date: Date;
-      
+
       // If it's already in DD/MM/YYYY format, return as is
       if (typeof dateString === 'string' && /^\d{2}\/\d{2}\/\d{4}$/.test(dateString)) {
         return dateString;
       }
-      
+
       // Try parsing as ISO date string
       date = new Date(dateString);
-      
+
       // Check if date is valid
       if (isNaN(date.getTime())) {
         // Try parsing as other formats
@@ -329,13 +450,13 @@ const DashboardPage: React.FC = () => {
             date = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
           }
         }
-        
+
         // If still invalid, return original string
         if (isNaN(date.getTime())) {
           return dateString;
         }
       }
-      
+
       const day = date.getDate().toString().padStart(2, '0');
       const month = (date.getMonth() + 1).toString().padStart(2, '0');
       const year = date.getFullYear();
@@ -349,7 +470,7 @@ const DashboardPage: React.FC = () => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#FF6B6B" />
-      
+
       {/* Side Menu */}
       <SideMenu
         visible={isMenuVisible}
@@ -366,7 +487,7 @@ const DashboardPage: React.FC = () => {
         onNavigateToAboutUs={() => navigateTo('/about-us')}
         onNavigateToCreateUser={() => navigateTo('/create-user')}
       />
-      
+
       {/* Blue Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.menuButton} onPress={handleMenuPress}>
@@ -376,9 +497,9 @@ const DashboardPage: React.FC = () => {
             <View style={styles.hamburgerLine} />
           </View>
         </TouchableOpacity>
-        
+
         <Text style={styles.headerTitle}>Dashboard</Text>
-        
+
         <View style={styles.headerRight} />
       </View>
 
@@ -387,35 +508,35 @@ const DashboardPage: React.FC = () => {
         {/* Client Information Card */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>CLIENT INFORMATION</Text>
-          
+
           {user?.reference_id && (
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Reference ID :</Text>
               <Text style={styles.infoValue}>{user.reference_id}</Text>
             </View>
           )}
-          
+
           {user?.job_no && (
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Job No :</Text>
               <Text style={styles.infoValue}>{user.job_no}</Text>
             </View>
           )}
-          
+
           {user?.site_name && (
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Site Name :</Text>
               <Text style={styles.infoValue}>{user.site_name}</Text>
             </View>
           )}
-          
+
           {user?.site_address && (
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Address :</Text>
               <Text style={styles.infoValue}>{user.site_address}</Text>
             </View>
           )}
-          
+
           {(user?.city_name || user?.province_state_name) && (
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Location :</Text>
@@ -424,56 +545,56 @@ const DashboardPage: React.FC = () => {
               </Text>
             </View>
           )}
-          
+
           {user?.pin_code && (
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Pin Code :</Text>
               <Text style={styles.infoValue}>{user.pin_code}</Text>
             </View>
           )}
-          
+
           {user?.phone && (
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Phone :</Text>
               <Text style={styles.infoValue}>{user.phone}</Text>
             </View>
           )}
-          
+
           {user?.mobile && (
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Mobile :</Text>
               <Text style={styles.infoValue}>{user.mobile}</Text>
             </View>
           )}
-          
+
           {user?.email && (
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Email :</Text>
               <Text style={styles.infoValue}>{user.email}</Text>
             </View>
           )}
-          
+
           {user?.contact_person_name && (
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Contact Person :</Text>
               <Text style={styles.infoValue}>{user.contact_person_name}</Text>
             </View>
           )}
-          
+
           {user?.branch_name && (
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Branch :</Text>
               <Text style={styles.infoValue}>{user.branch_name}</Text>
             </View>
           )}
-          
+
           {user?.route_name && (
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Route :</Text>
               <Text style={styles.infoValue}>{user.route_name}</Text>
             </View>
           )}
-          
+
           <View style={styles.sessionInfo}>
             <Text style={styles.sessionText}>
               Current Session : {user?.site_name || 'N/A'} | {user?.phone || user?.mobile || 'N/A'} | {user?.email || 'N/A'}
@@ -482,16 +603,23 @@ const DashboardPage: React.FC = () => {
         </View>
 
         {/* AMC Details Card */}
-        {!isLoadingAMC && amcSummary && (
+        {isLoadingAMC ? (
           <View style={styles.card}>
             <Text style={styles.cardTitle}>AMC DETAILS</Text>
-            
+            <View style={styles.loadingContainer}>
+              <Text style={styles.loadingText}>Loading AMC details...</Text>
+            </View>
+          </View>
+        ) : amcSummary ? (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>AMC DETAILS</Text>
+
             <View style={styles.amcSummaryRow}>
               <View style={styles.amcSummaryItem}>
                 <Text style={styles.amcSummaryLabel}>Total Contracts</Text>
                 <Text style={styles.amcSummaryValue}>{amcSummary.totalContracts}</Text>
               </View>
-              
+
               <View style={styles.amcSummaryItem}>
                 <Text style={styles.amcSummaryLabel}>Active Contracts</Text>
                 <Text style={[styles.amcSummaryValue, { color: '#FF6B6B' }]}>
@@ -499,7 +627,7 @@ const DashboardPage: React.FC = () => {
                 </Text>
               </View>
             </View>
-            
+
             <View style={styles.amcFinancialRow}>
               <View style={styles.amcFinancialItem}>
                 <Text style={styles.amcFinancialLabel}>Total Amount</Text>
@@ -507,14 +635,14 @@ const DashboardPage: React.FC = () => {
                   ₹{amcSummary.totalAmount.toFixed(2)}
                 </Text>
               </View>
-              
+
               <View style={styles.amcFinancialItem}>
                 <Text style={styles.amcFinancialLabel}>Paid Amount</Text>
                 <Text style={[styles.amcFinancialValue, { color: '#FF6B6B' }]}>
                   ₹{amcSummary.paidAmount.toFixed(2)}
                 </Text>
               </View>
-              
+
               <View style={styles.amcFinancialItem}>
                 <Text style={styles.amcFinancialLabel}>Due Amount</Text>
                 <Text style={[styles.amcFinancialValue, { color: '#F44336' }]}>
@@ -522,8 +650,8 @@ const DashboardPage: React.FC = () => {
                 </Text>
               </View>
             </View>
-            
-            {amcSummary.latestContract && (
+
+            {amcSummary.latestContract && amcSummary.latestContract.contractId !== 'N/A' && (
               <View style={styles.latestContractSection}>
                 <Text style={styles.latestContractTitle}>Latest Contract</Text>
                 <View style={styles.latestContractInfo}>
@@ -532,27 +660,38 @@ const DashboardPage: React.FC = () => {
                     {amcSummary.latestContract.contractId}
                   </Text>
                 </View>
-                <View style={styles.latestContractInfo}>
-                  <Text style={styles.latestContractLabel}>Status:</Text>
-                  <Text style={styles.latestContractValue}>
-                    {amcSummary.latestContract.status}
-                  </Text>
-                </View>
-                <View style={styles.latestContractInfo}>
-                  <Text style={styles.latestContractLabel}>Period:</Text>
-                  <Text style={styles.latestContractValue}>
-                    {amcSummary.latestContract.period}
-                  </Text>
-                </View>
+                {amcSummary.latestContract.status !== 'N/A' && (
+                  <View style={styles.latestContractInfo}>
+                    <Text style={styles.latestContractLabel}>Status:</Text>
+                    <Text style={styles.latestContractValue}>
+                      {amcSummary.latestContract.status}
+                    </Text>
+                  </View>
+                )}
+                {amcSummary.latestContract.period !== 'N/A' && (
+                  <View style={styles.latestContractInfo}>
+                    <Text style={styles.latestContractLabel}>Period:</Text>
+                    <Text style={styles.latestContractValue}>
+                      {amcSummary.latestContract.period}
+                    </Text>
+                  </View>
+                )}
               </View>
             )}
-            
-            <TouchableOpacity 
+
+            <TouchableOpacity
               style={styles.viewAllButton}
               onPress={() => navigateTo('/amc-contracts')}
             >
               <Text style={styles.viewAllButtonText}>View All AMC Contracts</Text>
             </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>AMC DETAILS</Text>
+            <View style={styles.loadingContainer}>
+              <Text style={styles.loadingText}>No AMC data available</Text>
+            </View>
           </View>
         )}
 
@@ -563,11 +702,11 @@ const DashboardPage: React.FC = () => {
               {amcSummary ? `${amcSummary.totalContracts} AMC${amcSummary.totalContracts !== 1 ? 's' : ''}` : 'No AMC'}
             </Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity style={styles.actionButton}>
             <Text style={styles.actionButtonText}>No Due Invoices</Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity style={styles.actionButton}>
             <Text style={styles.actionButtonText}>No Open Complaints</Text>
           </TouchableOpacity>
@@ -576,7 +715,7 @@ const DashboardPage: React.FC = () => {
         {/* Routine Services Card */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>ROUTINE SERVICES</Text>
-          
+
           {isLoadingRoutine ? (
             <View style={styles.loadingContainer}>
               <Text style={styles.loadingText}>Loading routine services...</Text>
@@ -586,44 +725,44 @@ const DashboardPage: React.FC = () => {
               {/* Last Service Section */}
               <View style={styles.serviceSection}>
                 <Text style={styles.serviceSectionTitle}>Last Service</Text>
-                
+
                 <View style={styles.serviceInfo}>
                   <Text style={styles.serviceLabel}>Last Service :</Text>
                   <Text style={styles.serviceValue}>
-                    {routineService?.lastService?.date && routineService.lastService.date.trim() !== '' 
-                      ? formatServiceDate(routineService.lastService.date) 
+                    {routineService?.lastService?.date && routineService.lastService.date.trim() !== ''
+                      ? formatServiceDate(routineService.lastService.date)
                       : 'N/A'}
                   </Text>
                 </View>
-                
+
                 <View style={styles.serviceInfo}>
                   <Text style={styles.serviceLabel}>Duration :</Text>
                   <Text style={styles.serviceValue}>
-                    {routineService?.lastService?.duration && routineService.lastService.duration.trim() !== '' 
-                      ? routineService.lastService.duration 
+                    {routineService?.lastService?.duration && routineService.lastService.duration.trim() !== ''
+                      ? routineService.lastService.duration
                       : 'N/A'}
                   </Text>
                 </View>
-                
+
                 <View style={styles.serviceInfo}>
                   <Text style={styles.serviceLabel}>Technician :</Text>
                   <Text style={styles.serviceValue}>
-                    {routineService?.lastService?.technician && routineService.lastService.technician.trim() !== '' 
-                      ? routineService.lastService.technician 
+                    {routineService?.lastService?.technician && routineService.lastService.technician.trim() !== ''
+                      ? routineService.lastService.technician
                       : 'Not assigned Yet'}
                   </Text>
                 </View>
-                
+
                 <View style={styles.serviceInfo}>
                   <Text style={styles.serviceLabel}>Code :</Text>
                   <Text style={styles.serviceValue}>
-                    {routineService?.lastService?.code && routineService.lastService.code.trim() !== '' 
-                      ? routineService.lastService.code 
+                    {routineService?.lastService?.code && routineService.lastService.code.trim() !== ''
+                      ? routineService.lastService.code
                       : 'Nil'}
                   </Text>
                 </View>
-                
-                <TouchableOpacity 
+
+                <TouchableOpacity
                   style={styles.downloadButton}
                   onPress={handleDownloadServiceSlip}
                 >
@@ -638,39 +777,39 @@ const DashboardPage: React.FC = () => {
               {/* Upcoming Service Section */}
               <View style={styles.serviceSection}>
                 <Text style={styles.serviceSectionTitle}>Upcoming Service</Text>
-                
+
                 <View style={styles.serviceInfo}>
                   <Text style={styles.serviceLabel}>Upcoming Service :</Text>
                   <Text style={styles.serviceValue}>
-                    {routineService?.upcomingService?.date && routineService.upcomingService.date.trim() !== '' 
-                      ? formatServiceDate(routineService.upcomingService.date) 
+                    {routineService?.upcomingService?.date && routineService.upcomingService.date.trim() !== ''
+                      ? formatServiceDate(routineService.upcomingService.date)
                       : 'N/A'}
                   </Text>
                 </View>
-                
+
                 <View style={styles.serviceInfo}>
                   <Text style={styles.serviceLabel}>Duration :</Text>
                   <Text style={styles.serviceValue}>
-                    {routineService?.upcomingService?.duration && routineService.upcomingService.duration.trim() !== '' 
-                      ? routineService.upcomingService.duration 
+                    {routineService?.upcomingService?.duration && routineService.upcomingService.duration.trim() !== ''
+                      ? routineService.upcomingService.duration
                       : 'N/A'}
                   </Text>
                 </View>
-                
+
                 <View style={styles.serviceInfo}>
                   <Text style={styles.serviceLabel}>Technician :</Text>
                   <Text style={styles.serviceValue}>
-                    {routineService?.upcomingService?.technician && routineService.upcomingService.technician.trim() !== '' 
-                      ? routineService.upcomingService.technician 
+                    {routineService?.upcomingService?.technician && routineService.upcomingService.technician.trim() !== ''
+                      ? routineService.upcomingService.technician
                       : 'Not assigned'}
                   </Text>
                 </View>
-                
+
                 <View style={styles.serviceInfo}>
                   <Text style={styles.serviceLabel}>Code :</Text>
                   <Text style={styles.serviceValue}>
-                    {routineService?.upcomingService?.code && routineService.upcomingService.code.trim() !== '' 
-                      ? routineService.upcomingService.code 
+                    {routineService?.upcomingService?.code && routineService.upcomingService.code.trim() !== ''
+                      ? routineService.upcomingService.code
                       : 'N/A'}
                   </Text>
                 </View>

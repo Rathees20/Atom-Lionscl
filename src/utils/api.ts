@@ -14,13 +14,16 @@ export const API_ENDPOINTS = {
   CUSTOMER_QUOTATIONS: `${API_BASE_URL}/quotation/api/customer/quotations/`,
   // Customer AMCs
   CUSTOMER_AMCS: `${API_BASE_URL}/amc/api/customer/amcs/`,
+  CUSTOMER_AMC_DOWNLOAD_AGREEMENT: `${API_BASE_URL}/amc/api/customer/amcs/{amc_id}/download-agreement/`,
   // Customer complaints
   CUSTOMER_LIFTS: `${API_BASE_URL}/complaints/api/customer/lifts/`,
   CUSTOMER_COMPLAINTS: `${API_BASE_URL}/complaints/api/customer/complaints/`,
   CUSTOMER_CREATE_COMPLAINT: `${API_BASE_URL}/complaints/api/customer/complaints/create/`,
+  CUSTOMER_COMPLAINT_PDF: `${API_BASE_URL}/complaints/api/customer/complaints/{reference}/pdf/`,
   // Routine services
   ROUTINE_SERVICES: `${API_BASE_URL}/routine-services/api/mobile/routine-services/`,
   ROUTINE_SERVICES_ALL: `${API_BASE_URL}/routine-services/api/mobile/routine-services/all/`,
+  ROUTINE_SERVICES_DOWNLOAD_SLIP: `${API_BASE_URL}/routine-services/api/mobile/download-service-slip`,
 };
 
 export default API_BASE_URL;

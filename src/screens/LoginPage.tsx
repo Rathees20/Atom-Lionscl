@@ -7,7 +7,6 @@ import {
   Platform,
   TouchableOpacity,
   TextInput,
-  Alert,
   ScrollView,
   StatusBar,
   Image,
@@ -15,6 +14,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '../contexts/NavigationContext';
 import { API_ENDPOINTS } from '../utils/api';
+import { CrossPlatformAlert } from '../utils/alerts';
 
 const { width, height } = Dimensions.get('window');
 const isWeb = Platform.OS === 'web';
@@ -30,14 +30,14 @@ const LoginPage: React.FC = () => {
 
   const handleGenerateOTP = async () => {
     if (!email.trim()) {
-      Alert.alert('Error', 'Please enter your email address');
+      CrossPlatformAlert.alert('Error', 'Please enter your email address');
       return;
     }
 
     // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email.trim())) {
-      Alert.alert('Error', 'Please enter a valid email address');
+      CrossPlatformAlert.alert('Error', 'Please enter a valid email address');
       return;
     }
 
@@ -55,9 +55,9 @@ const LoginPage: React.FC = () => {
 
       if (response.ok) {
         setOtpSent(true);
-        Alert.alert('Success', data.message || 'OTP sent to your email');
+        CrossPlatformAlert.alert('Success', data.message || 'OTP sent to your email');
       } else {
-        Alert.alert('Error', data.error || 'Failed to send OTP. Please try again.');
+        CrossPlatformAlert.alert('Error', data.error || 'Failed to send OTP. Please try again.');
       }
     } catch (error) {
       console.error('Error generating OTP:', error);
@@ -69,12 +69,12 @@ const LoginPage: React.FC = () => {
 
   const handleVerifyOTP = async () => {
     if (!email.trim()) {
-      Alert.alert('Error', 'Please enter your email address');
+      CrossPlatformAlert.alert('Error', 'Please enter your email address');
       return;
     }
 
     if (!otpCode.trim() || otpCode.length !== 6) {
-      Alert.alert('Error', 'Please enter a valid 6-digit OTP');
+      CrossPlatformAlert.alert('Error', 'Please enter a valid 6-digit OTP');
       return;
     }
 
@@ -98,11 +98,11 @@ const LoginPage: React.FC = () => {
         setUser(data.customer);
         navigateTo('/dashboard');
       } else {
-        Alert.alert('Error', data.error || 'Invalid OTP. Please try again.');
+        CrossPlatformAlert.alert('Error', data.error || 'Invalid OTP. Please try again.');
       }
     } catch (error) {
       console.error('Error verifying OTP:', error);
-      Alert.alert('Error', 'Network error. Please check your connection and try again.');
+      CrossPlatformAlert.alert('Error', 'Network error. Please check your connection and try again.');
     } finally {
       setIsLoading(false);
     }
@@ -110,7 +110,7 @@ const LoginPage: React.FC = () => {
 
   const handleResendOTP = async () => {
     if (!email.trim()) {
-      Alert.alert('Error', 'Please enter your email address');
+      CrossPlatformAlert.alert('Error', 'Please enter your email address');
       return;
     }
 
@@ -127,13 +127,13 @@ const LoginPage: React.FC = () => {
       const data = await response.json();
 
       if (response.ok) {
-        Alert.alert('Success', data.message || 'OTP resent to your email');
+        CrossPlatformAlert.alert('Success', data.message || 'OTP resent to your email');
       } else {
-        Alert.alert('Error', data.error || 'Failed to resend OTP. Please try again.');
+        CrossPlatformAlert.alert('Error', data.error || 'Failed to resend OTP. Please try again.');
       }
     } catch (error) {
       console.error('Error resending OTP:', error);
-      Alert.alert('Error', 'Network error. Please check your connection and try again.');
+      CrossPlatformAlert.alert('Error', 'Network error. Please check your connection and try again.');
     } finally {
       setIsLoading(false);
     }
@@ -143,7 +143,7 @@ const LoginPage: React.FC = () => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#FF6B6B" />
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -172,8 +172,8 @@ const LoginPage: React.FC = () => {
               isFocusedEmail && styles.inputWrapperFocused
             ]}>
               <View style={styles.iconContainer}>
-                <Image 
-                  source={require('../assets/mail.png')} 
+                <Image
+                  source={require('../assets/mail.png')}
                   style={styles.inputIcon}
                   resizeMode="contain"
                 />
@@ -203,29 +203,29 @@ const LoginPage: React.FC = () => {
                 styles.inputWrapper,
                 isFocusedOtp && styles.inputWrapperFocused
               ]}>
-              <View style={styles.iconContainer}>
-                <Text style={styles.lockIcon}>🔐</Text>
+                <View style={styles.iconContainer}>
+                  <Text style={styles.lockIcon}>🔐</Text>
+                </View>
+                <TextInput
+                  style={styles.textInput}
+                  value={otpCode}
+                  onChangeText={setOtpCode}
+                  placeholder="Enter 6-digit OTP"
+                  placeholderTextColor="#999999"
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  onFocus={() => setIsFocusedOtp(true)}
+                  onBlur={() => setIsFocusedOtp(false)}
+                />
               </View>
-              <TextInput
-                style={styles.textInput}
-                value={otpCode}
-                onChangeText={setOtpCode}
-                placeholder="Enter 6-digit OTP"
-                placeholderTextColor="#999999"
-                keyboardType="number-pad"
-                maxLength={6}
-                autoCapitalize="none"
-                autoCorrect={false}
-                onFocus={() => setIsFocusedOtp(true)}
-                onBlur={() => setIsFocusedOtp(false)}
-              />
-            </View>
             </View>
           )}
 
           {/* Resend OTP Link - Show only after OTP is sent */}
           {otpSent && (
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.forgotPasswordLink}
               onPress={handleResendOTP}
               disabled={isLoading}

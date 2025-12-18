@@ -96,7 +96,7 @@ const ComplaintsPage: React.FC = () => {
   const loadComplaintsData = async () => {
     try {
       setIsLoading(true);
-      
+
       // Get email from user object
       const userEmail = user?.email;
       if (!userEmail) {
@@ -105,11 +105,11 @@ const ComplaintsPage: React.FC = () => {
         setIsLoading(false);
         return;
       }
-      
+
       // Add email as query parameter
       const url = `${API_ENDPOINTS.CUSTOMER_COMPLAINTS}?email=${encodeURIComponent(userEmail)}`;
       console.log('Fetching complaints from:', url);
-      
+
       const response = await fetch(url, {
         method: 'GET',
         headers: {
@@ -123,7 +123,7 @@ const ComplaintsPage: React.FC = () => {
       if (response.ok) {
         // Handle different response formats
         let complaintsArray: any[] = [];
-        
+
         if (Array.isArray(data)) {
           complaintsArray = data;
         } else if (data.complaints && Array.isArray(data.complaints)) {
@@ -142,45 +142,45 @@ const ComplaintsPage: React.FC = () => {
             }
           }
         }
-        
+
         console.log('Extracted complaints array:', complaintsArray);
 
         // Map API response to Complaint interface
         const mappedComplaints: Complaint[] = complaintsArray.map((item: any, index: number) => {
           // Extract ID
-          const id = item.id?.toString() || 
-                     item.complaint_id?.toString() || 
-                     item.ticket_id?.toString() || 
-                     index.toString();
-          
+          const id = item.id?.toString() ||
+            item.complaint_id?.toString() ||
+            item.ticket_id?.toString() ||
+            index.toString();
+
           // Extract ticket number
-          const ticketNumber = item.ticket_number?.toString() || 
-                               item.ticketNumber?.toString() || 
-                               item.ticket_id?.toString() || 
-                               item.id?.toString() || 
-                               id;
-          
+          const ticketNumber = item.ticket_number?.toString() ||
+            item.ticketNumber?.toString() ||
+            item.ticket_id?.toString() ||
+            item.id?.toString() ||
+            id;
+
           // Extract dates and times
           const createdDateStr = item.created_date || item.createdDate || item.created_at || item.date_created || '';
           const assignedDateStr = item.assigned_date || item.assignedDate || item.assigned_at || item.date_assigned || createdDateStr;
-          
+
           const createdDate = formatDate(createdDateStr);
           const createdTime = formatTime(createdDateStr);
           const assignedDate = formatDate(assignedDateStr);
           const assignedTime = formatTime(assignedDateStr);
-          
+
           // Extract status
           const status = normalizeStatus(item.status || item.complaint_status || 'open');
-          const statusText = item.status_text || 
-                            item.statusText || 
-                            `${createdDate} ${createdTime} (${status})`;
-          
+          const statusText = item.status_text ||
+            item.statusText ||
+            `${createdDate} ${createdTime} (${status})`;
+
           // Extract description
-          let description = item.description || 
-                           item.complaint_description || 
-                           item.complaint_type || 
-                           '';
-          
+          let description = item.description ||
+            item.complaint_description ||
+            item.complaint_type ||
+            '';
+
           // Handle complaint_templates - could be array, string, or other
           if (!description && item.complaint_templates) {
             if (Array.isArray(item.complaint_templates)) {
@@ -191,14 +191,14 @@ const ComplaintsPage: React.FC = () => {
               description = String(item.complaint_templates);
             }
           }
-          
+
           if (!description) {
             description = 'No description available';
           }
-          
+
           // Extract priority
           const priority = item.priority || getPriority(item);
-          
+
           return {
             id: id,
             ticketNumber: ticketNumber,
@@ -215,7 +215,7 @@ const ComplaintsPage: React.FC = () => {
 
         console.log('Mapped complaints:', mappedComplaints);
         setComplaints(mappedComplaints);
-        
+
         if (mappedComplaints.length === 0) {
           console.warn('No complaints found in API response');
         }
@@ -256,8 +256,40 @@ const ComplaintsPage: React.FC = () => {
   };
 
   const handleGoToDetails = (complaint: Complaint) => {
-    // Navigate to ticket details page
+    // Navigate to ticket details page with complete data
     navigateTo('/ticket-details', complaint);
+  };
+
+  const handleDownloadPDF = async (complaint: Complaint) => {
+    try {
+      // Get the ticket reference/id
+      const reference = complaint.ticketNumber || complaint.id;
+      if (!reference) {
+        Alert.alert('Error', 'Unable to identify ticket reference.');
+        return;
+      }
+
+      // Construct the PDF download URL
+      const pdfUrl = API_ENDPOINTS.CUSTOMER_COMPLAINT_PDF.replace('{reference}', reference);
+
+      // For web platforms, open in new tab
+      if (Platform.OS === 'web') {
+        window.open(pdfUrl, '_blank');
+      } else {
+        // For mobile platforms, we would typically use a library like react-native-pdf or similar
+        // For now, we'll show an alert with the URL
+        Alert.alert(
+          'PDF Download',
+          `To download the PDF, please visit: ${pdfUrl}`,
+          [
+            { text: 'OK' }
+          ]
+        );
+      }
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+      Alert.alert('Error', 'Failed to download PDF. Please try again.');
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -299,22 +331,22 @@ const ComplaintsPage: React.FC = () => {
     return (
       <View style={styles.container}>
         <StatusBar barStyle="light-content" backgroundColor="#FF6B6B" />
-        
+
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-            <Image 
-              source={require('../assets/left-chevron.png')} 
+            <Image
+              source={require('../assets/left-chevron.png')}
               style={styles.backIcon}
               resizeMode="contain"
             />
           </TouchableOpacity>
-          
+
           <Text style={styles.headerTitle}>Tickets</Text>
-          
+
           <TouchableOpacity style={styles.searchButton} onPress={handleSearch}>
-            <Image 
-              source={require('../assets/search.png')} 
+            <Image
+              source={require('../assets/search.png')}
               style={styles.searchIcon}
               resizeMode="contain"
             />
@@ -332,22 +364,22 @@ const ComplaintsPage: React.FC = () => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#FF6B6B" />
-      
+
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-          <Image 
-            source={require('../assets/left-chevron.png')} 
+          <Image
+            source={require('../assets/left-chevron.png')}
             style={styles.backIcon}
             resizeMode="contain"
           />
         </TouchableOpacity>
-        
+
         <Text style={styles.headerTitle}>Tickets</Text>
-        
+
         <TouchableOpacity style={styles.searchButton} onPress={handleSearch}>
-          <Image 
-            source={require('../assets/search.png')} 
+          <Image
+            source={require('../assets/search.png')}
             style={styles.searchIcon}
             resizeMode="contain"
           />
@@ -391,7 +423,7 @@ const ComplaintsPage: React.FC = () => {
             {/* Ticket Number and Details */}
             <View style={styles.ticketHeader}>
               <Text style={styles.ticketNumber}>{index + 1}.</Text>
-              
+
               <View style={styles.ticketDetails}>
                 <Text style={styles.ticketId}>
                   {complaint.ticketNumber} # Created at {complaint.createdDate}
@@ -402,26 +434,34 @@ const ComplaintsPage: React.FC = () => {
                 <Text style={styles.ticketAssignTime}>
                   {complaint.assignedTime}(A)
                 </Text>
-                
+
                 {/* Status */}
                 <Text style={[styles.ticketStatus, { color: getStatusColor(complaint.status) }]}>
                   {complaint.statusText}
                 </Text>
               </View>
-              
+
               <TouchableOpacity style={styles.expandButton} onPress={() => toggleExpanded(complaint.id)}>
                 <Text style={styles.expandIcon}>{expandedIds.has(complaint.id) ? '▲' : '▼'}</Text>
               </TouchableOpacity>
             </View>
 
-            {/* Go to Details Button - only when expanded */}
+            {/* Action Buttons - only when expanded */}
             {expandedIds.has(complaint.id) && (
-              <TouchableOpacity 
-                style={styles.detailsButton}
-                onPress={() => handleGoToDetails(complaint)}
-              >
-                <Text style={styles.detailsButtonText}>Go to Details</Text>
-              </TouchableOpacity>
+              <>
+                <TouchableOpacity
+                  style={styles.detailsButton}
+                  onPress={() => handleGoToDetails(complaint)}
+                >
+                  <Text style={styles.detailsButtonText}>Go to Details</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.detailsButton, { backgroundColor: '#2196F3', marginTop: 10 }]}
+                  onPress={() => handleDownloadPDF(complaint)}
+                >
+                  <Text style={styles.detailsButtonText}>Download PDF</Text>
+                </TouchableOpacity>
+              </>
             )}
           </View>
         ))}

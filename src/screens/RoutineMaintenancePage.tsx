@@ -31,7 +31,7 @@ const RoutineMaintenancePage: React.FC = () => {
   const { navigateTo, user } = useNavigation();
   const [maintenanceItems, setMaintenanceItems] = useState<MaintenanceItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  
+
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchVisible, setIsSearchVisible] = useState(false);
   const [filteredItems, setFilteredItems] = useState<MaintenanceItem[]>([]);
@@ -40,7 +40,7 @@ const RoutineMaintenancePage: React.FC = () => {
   const [selectedTimeFrame, setSelectedTimeFrame] = useState('');
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const [isTimeFrameDropdownOpen, setIsTimeFrameDropdownOpen] = useState(false);
-  
+
   const statusOptions = ['all', 'due', 'overdue', 'in progress', 'completed'];
   const timeFrameOptions = [
     'All',
@@ -50,7 +50,7 @@ const RoutineMaintenancePage: React.FC = () => {
     'Next 15 days',
     'Next 30 days',
     'Next 45 days',
-    
+
   ];
 
   // Load maintenance items on component mount
@@ -68,7 +68,7 @@ const RoutineMaintenancePage: React.FC = () => {
   const loadMaintenanceItems = async () => {
     try {
       setIsLoading(true);
-      
+
       const userEmail = user?.email;
       if (!userEmail) {
         Alert.alert('Error', 'User email not found. Please login again.');
@@ -76,10 +76,10 @@ const RoutineMaintenancePage: React.FC = () => {
         setIsLoading(false);
         return;
       }
-      
+
       const url = `${API_ENDPOINTS.ROUTINE_SERVICES_ALL}?email=${encodeURIComponent(userEmail)}`;
       console.log('Fetching routine services from:', url);
-      
+
       const response = await fetch(url, {
         method: 'GET',
         headers: {
@@ -93,7 +93,7 @@ const RoutineMaintenancePage: React.FC = () => {
       if (response.ok) {
         // Handle different response formats
         let servicesArray: any[] = [];
-        
+
         if (Array.isArray(data)) {
           servicesArray = data;
         } else if (data.services || data.routine_services || data.results) {
@@ -111,43 +111,43 @@ const RoutineMaintenancePage: React.FC = () => {
             }
           }
         }
-        
+
         console.log('Extracted services array:', servicesArray);
 
         // Map API response to MaintenanceItem interface
         const mappedItems: MaintenanceItem[] = servicesArray.map((item: any, index: number) => {
           // Extract ID
-          const id = item.id?.toString() || 
-                     item.service_id?.toString() || 
-                     item.maintenance_id?.toString() || 
-                     index.toString();
-          
+          const id = item.id?.toString() ||
+            item.service_id?.toString() ||
+            item.maintenance_id?.toString() ||
+            index.toString();
+
           // Extract service date
-          const serviceDate = item.service_date || 
-                             item.serviceDate || 
-                             item.date || 
-                             item.scheduled_date ||
-                             item.scheduledDate ||
-                             '';
-          
+          const serviceDate = item.service_date ||
+            item.serviceDate ||
+            item.date ||
+            item.scheduled_date ||
+            item.scheduledDate ||
+            '';
+
           // Extract assign/technician
-          const assign = item.assign || 
-                        item.assigned_to || 
-                        item.assignedTo ||
-                        item.technician ||
-                        item.technician_name ||
-                        item.technicianName ||
-                        'Not assigned Yet';
-          
+          const assign = item.assign ||
+            item.assigned_to ||
+            item.assignedTo ||
+            item.technician ||
+            item.technician_name ||
+            item.technicianName ||
+            'Not assigned Yet';
+
           // Extract status
           const status = (item.status || 'all').toLowerCase() as MaintenanceItem['status'];
-          
+
           // Extract month
-          const month = item.month || 
-                       item.service_month ||
-                       item.serviceMonth ||
-                       (serviceDate ? new Date(serviceDate).toLocaleString('default', { month: 'long' }) : '');
-          
+          const month = item.month ||
+            item.service_month ||
+            item.serviceMonth ||
+            (serviceDate ? new Date(serviceDate).toLocaleString('default', { month: 'long' }) : '');
+
           return {
             id: id,
             serviceDate: serviceDate,
@@ -159,7 +159,7 @@ const RoutineMaintenancePage: React.FC = () => {
 
         console.log('Mapped maintenance items:', mappedItems);
         setMaintenanceItems(mappedItems);
-        
+
         if (mappedItems.length === 0) {
           console.warn('No maintenance items found in API response');
         }
@@ -188,18 +188,18 @@ const RoutineMaintenancePage: React.FC = () => {
     const maintenanceDetails = {
       id: item.id,
       amcRef: `AMC${item.id}`, // Generate AMC ref from ID
-      siteId: `98${item.id}`, // Generate site ID from item ID
+      siteId: `SITE${item.id}`, // Generate site ID from item ID
       siteName: `Site ${item.id}`,
       siteAddress: 'Address not specified',
       serviceDate: item.serviceDate,
       month: item.month,
       siteCity: 'City not specified',
       status: item.status,
-      blockWing: '',
-      attendAt: '',
-      attendBy: item.assign === 'Not assigned Yet' ? '' : item.assign,
+      blockWing: 'Block/Wing not specified',
+      attendAt: 'Not scheduled',
+      attendBy: item.assign === 'Not assigned Yet' ? 'Not assigned' : item.assign,
     };
-    
+
     navigateTo('/maintenance-details', maintenanceDetails);
   };
 
@@ -224,18 +224,18 @@ const RoutineMaintenancePage: React.FC = () => {
   const handleFilterSearch = () => {
     // Apply filters based on selected options
     let filtered = maintenanceItems;
-    
+
     if (selectedStatus && selectedStatus !== 'all') {
       filtered = filtered.filter(item => item.status === selectedStatus);
     }
-    
+
     if (selectedTimeFrame && selectedTimeFrame !== 'All') {
       // Filter by time frame logic here
       // For now, just show all items as the time frame filtering would require
       // actual date calculations based on the service dates
       // This is a placeholder for the time frame filtering logic
     }
-    
+
     setFilteredItems(filtered);
     setIsFilterModalVisible(false);
     Alert.alert('Filter Applied', 'Results have been filtered based on your selection.');
@@ -301,26 +301,26 @@ const RoutineMaintenancePage: React.FC = () => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#FF6B6B" />
-      
+
       {/* Blue Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-          <Image 
-            source={require('../assets/left-chevron.png')} 
+          <Image
+            source={require('../assets/left-chevron.png')}
             style={styles.backIcon}
             resizeMode="contain"
           />
         </TouchableOpacity>
-        
+
         <Text style={styles.headerTitle}>Routine Maintenance</Text>
-        
+
         <View style={styles.headerRight}>
           <TouchableOpacity style={styles.refreshButton} onPress={handleRefresh}>
             <Text style={styles.refreshIcon}>🔄</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.searchButton} onPress={handleSearchToggle}>
-            <Image 
-              source={require('../assets/search.png')} 
+            <Image
+              source={require('../assets/search.png')}
               style={styles.searchIcon}
               resizeMode="contain"
             />
@@ -356,49 +356,49 @@ const RoutineMaintenancePage: React.FC = () => {
           </View>
         ) : (
           filteredItems.map((item, index) => (
-          <View key={item.id} style={styles.maintenanceItem}>
-            <View style={styles.itemHeader}>
-              <Text style={styles.itemNumber}>{index + 1}.</Text>
-              <TouchableOpacity style={styles.expandButton}>
-                <Text style={styles.expandIcon}>▼</Text>
+            <View key={item.id} style={styles.maintenanceItem}>
+              <View style={styles.itemHeader}>
+                <Text style={styles.itemNumber}>{index + 1}.</Text>
+                <TouchableOpacity style={styles.expandButton}>
+                  <Text style={styles.expandIcon}>▼</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.itemDetails}>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Service Date:</Text>
+                  <Text style={styles.detailValue}>{item.serviceDate}</Text>
+                </View>
+
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Assign:</Text>
+                  <Text style={styles.detailValue}>
+                    {item.assign} ({item.month})
+                  </Text>
+                </View>
+
+                <View style={styles.statusRow}>
+                  <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
+                    {getStatusText(item.status)}
+                  </Text>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={styles.goToDetailsButton}
+                onPress={() => handleGoToDetails(item)}
+              >
+                <Text style={styles.goToDetailsText}>Go to Details</Text>
               </TouchableOpacity>
             </View>
-            
-            <View style={styles.itemDetails}>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Service Date:</Text>
-                <Text style={styles.detailValue}>{item.serviceDate}</Text>
-              </View>
-              
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Assign:</Text>
-                <Text style={styles.detailValue}>
-                  {item.assign} ({item.month})
-                </Text>
-              </View>
-              
-              <View style={styles.statusRow}>
-                <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
-                  {getStatusText(item.status)}
-                </Text>
-              </View>
-            </View>
-            
-            <TouchableOpacity
-              style={styles.goToDetailsButton}
-              onPress={() => handleGoToDetails(item)}
-            >
-              <Text style={styles.goToDetailsText}>Go to Details</Text>
-            </TouchableOpacity>
-          </View>
           ))
         )}
       </ScrollView>
 
       {/* Filter Floating Action Button */}
       <TouchableOpacity style={styles.filterFab} onPress={handleFilter}>
-        <Image 
-          source={require('../assets/filter.png')} 
+        <Image
+          source={require('../assets/filter.png')}
           style={styles.filterIcon}
           resizeMode="contain"
         />
@@ -416,7 +416,7 @@ const RoutineMaintenancePage: React.FC = () => {
           <View style={styles.modalContent}>
             {/* Modal Handle */}
             <View style={styles.modalHandle} />
-            
+
             {/* Header */}
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Filter Options</Text>
@@ -428,7 +428,7 @@ const RoutineMaintenancePage: React.FC = () => {
               {/* Status Filter */}
               <View style={styles.filterField}>
                 <Text style={styles.filterLabel}>Status</Text>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.filterDropdown}
                   onPress={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
                 >
@@ -437,7 +437,7 @@ const RoutineMaintenancePage: React.FC = () => {
                   </Text>
                   <Text style={styles.dropdownIcon}>{isStatusDropdownOpen ? '▲' : '▼'}</Text>
                 </TouchableOpacity>
-                
+
                 {/* Status Options Dropdown */}
                 {isStatusDropdownOpen && (
                   <View style={styles.dropdownOptions}>
@@ -465,7 +465,7 @@ const RoutineMaintenancePage: React.FC = () => {
               {/* Time Frame Filter */}
               <View style={styles.filterField}>
                 <Text style={styles.filterLabel}>For</Text>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.filterDropdown}
                   onPress={() => setIsTimeFrameDropdownOpen(!isTimeFrameDropdownOpen)}
                 >
@@ -474,7 +474,7 @@ const RoutineMaintenancePage: React.FC = () => {
                   </Text>
                   <Text style={styles.dropdownIcon}>{isTimeFrameDropdownOpen ? '▲' : '▼'}</Text>
                 </TouchableOpacity>
-                
+
                 {/* Time Frame Options Dropdown */}
                 {isTimeFrameDropdownOpen && (
                   <View style={styles.dropdownOptions}>

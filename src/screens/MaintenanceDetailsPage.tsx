@@ -41,18 +41,18 @@ const MaintenanceDetailsPage: React.FC<MaintenanceDetailsPageProps> = ({ mainten
   const [isRoutineServiceExpanded, setIsRoutineServiceExpanded] = useState(false);
   const [isMaterialInfoExpanded, setIsMaterialInfoExpanded] = useState(false);
   const [maintenanceDetails, setMaintenanceDetails] = useState<MaintenanceDetails>(maintenanceItem || navigationData || {
-    id: '',
-    amcRef: '',
-    siteId: '',
-    siteName: '',
-    siteAddress: '',
-    serviceDate: '',
-    month: '',
-    siteCity: '',
-    status: '',
-    blockWing: '',
-    attendAt: '',
-    attendBy: '',
+    id: 'N/A',
+    amcRef: 'N/A',
+    siteId: 'N/A',
+    siteName: 'Site information not available',
+    siteAddress: 'Address not specified',
+    serviceDate: 'Date not specified',
+    month: 'Month not specified',
+    siteCity: 'City not specified',
+    status: 'all',
+    blockWing: 'Not specified',
+    attendAt: 'Not scheduled',
+    attendBy: 'Not assigned',
   });
   const [isLoading, setIsLoading] = useState(true);
 
@@ -64,11 +64,22 @@ const MaintenanceDetailsPage: React.FC<MaintenanceDetailsPageProps> = ({ mainten
   const loadMaintenanceDetails = async () => {
     try {
       setIsLoading(true);
-      
+
       // Get maintenance ID from navigation data
       const maintenanceId = navigationData?.id || maintenanceItem?.id;
-      
+
+      // If we already have complete data from navigation, use it
+      if (navigationData && navigationData.id && navigationData.siteName) {
+        setMaintenanceDetails(navigationData);
+        setIsLoading(false);
+        return;
+      }
+
       if (!maintenanceId) {
+        // Use the initial data if no ID
+        if (maintenanceItem || navigationData) {
+          setMaintenanceDetails(maintenanceItem || navigationData);
+        }
         setIsLoading(false);
         return;
       }
@@ -83,7 +94,7 @@ const MaintenanceDetailsPage: React.FC<MaintenanceDetailsPageProps> = ({ mainten
       // Fetch all services and find the matching one
       const url = `${API_ENDPOINTS.ROUTINE_SERVICES_ALL}?email=${encodeURIComponent(userEmail)}`;
       console.log('Fetching maintenance details from:', url);
-      
+
       const response = await fetch(url, {
         method: 'GET',
         headers: {
@@ -97,7 +108,7 @@ const MaintenanceDetailsPage: React.FC<MaintenanceDetailsPageProps> = ({ mainten
       if (response.ok) {
         // Handle different response formats
         let servicesArray: any[] = [];
-        
+
         if (Array.isArray(data)) {
           servicesArray = data;
         } else if (data.services || data.routine_services || data.results) {
@@ -106,82 +117,146 @@ const MaintenanceDetailsPage: React.FC<MaintenanceDetailsPageProps> = ({ mainten
             servicesArray = [];
           }
         }
-        
+
         // Find the matching service by ID
         const serviceData = servicesArray.find((item: any) => {
-          const itemId = item.id?.toString() || 
-                        item.service_id?.toString() || 
-                        item.maintenance_id?.toString() || 
-                        '';
+          const itemId = item.id?.toString() ||
+            item.service_id?.toString() ||
+            item.maintenance_id?.toString() ||
+            '';
           return itemId === maintenanceId.toString();
         });
-        
+
         if (serviceData) {
           // Map API response to MaintenanceDetails interface
           const details: MaintenanceDetails = {
             id: serviceData.id?.toString() || maintenanceId,
-            amcRef: serviceData.amc_ref || 
-                   serviceData.amcRef || 
-                   serviceData.amc_reference ||
-                   serviceData.amc?.reference ||
-                   '',
-            siteId: serviceData.site_id?.toString() || 
-                   serviceData.siteId?.toString() || 
-                   serviceData.site?.id?.toString() ||
-                   '',
-            siteName: serviceData.site_name || 
-                     serviceData.siteName || 
-                     serviceData.site?.name ||
-                     serviceData.project_name ||
-                     '',
-            siteAddress: serviceData.site_address || 
-                        serviceData.siteAddress || 
-                        serviceData.address ||
-                        serviceData.site?.address ||
-                        '',
-            serviceDate: serviceData.service_date || 
-                       serviceData.serviceDate || 
-                       serviceData.date ||
-                       serviceData.scheduled_date ||
-                       '',
-            month: serviceData.month || 
-                  serviceData.service_month ||
-                  serviceData.serviceMonth ||
-                  '',
-            siteCity: serviceData.site_city || 
-                     serviceData.siteCity || 
-                     serviceData.city ||
-                     serviceData.site?.city ||
-                     '',
-            status: serviceData.status || 'all',
-            blockWing: serviceData.block_wing || 
-                      serviceData.blockWing || 
-                      serviceData.block ||
-                      '',
-            attendAt: serviceData.attend_at || 
-                     serviceData.attendAt || 
-                     serviceData.attended_at ||
-                     '',
-            attendBy: serviceData.attend_by || 
-                     serviceData.attendBy || 
-                     serviceData.technician ||
-                     serviceData.technician_name ||
-                     '',
+            amcRef: serviceData.amc_ref ||
+              serviceData.amcRef ||
+              serviceData.amc_reference ||
+              serviceData.amc?.reference ||
+              `AMC${maintenanceId}`,
+            siteId: serviceData.site_id?.toString() ||
+              serviceData.siteId?.toString() ||
+              serviceData.site?.id?.toString() ||
+              `SITE${maintenanceId}`,
+            siteName: serviceData.site_name ||
+              serviceData.siteName ||
+              serviceData.site?.name ||
+              serviceData.project_name ||
+              `Site ${maintenanceId}`,
+            siteAddress: serviceData.site_address ||
+              serviceData.siteAddress ||
+              serviceData.address ||
+              serviceData.site?.address ||
+              'Address not specified',
+            serviceDate: serviceData.service_date ||
+              serviceData.serviceDate ||
+              serviceData.date ||
+              serviceData.scheduled_date ||
+              'Date not specified',
+            month: serviceData.month ||
+              serviceData.service_month ||
+              serviceData.serviceMonth ||
+              (serviceData.service_date ? new Date(serviceData.service_date).toLocaleString('default', { month: 'long' }) : 'Month not specified'),
+            siteCity: serviceData.site_city ||
+              serviceData.siteCity ||
+              serviceData.city ||
+              serviceData.site?.city ||
+              'City not specified',
+            status: (serviceData.status || 'all').toLowerCase(),
+            blockWing: serviceData.block_wing ||
+              serviceData.blockWing ||
+              serviceData.block ||
+              'Not specified',
+            attendAt: serviceData.attend_at ||
+              serviceData.attendAt ||
+              serviceData.attended_at ||
+              'Not scheduled',
+            attendBy: serviceData.attend_by ||
+              serviceData.attendBy ||
+              serviceData.technician ||
+              serviceData.technician_name ||
+              'Not assigned',
           };
-          
+
           setMaintenanceDetails(details);
         } else {
           // Use navigation data if API doesn't have the item
           if (navigationData) {
-            setMaintenanceDetails(navigationData);
+            // Enhance navigation data with better defaults
+            const enhancedData = {
+              ...navigationData,
+              amcRef: navigationData.amcRef || `AMC${maintenanceId}`,
+              siteId: navigationData.siteId || `SITE${maintenanceId}`,
+              siteName: navigationData.siteName || `Site ${maintenanceId}`,
+              siteAddress: navigationData.siteAddress || 'Address not specified',
+              serviceDate: navigationData.serviceDate || 'Date not specified',
+              month: navigationData.month || 'Month not specified',
+              siteCity: navigationData.siteCity || 'City not specified',
+              status: (navigationData.status || 'all').toLowerCase(),
+              blockWing: navigationData.blockWing || 'Not specified',
+              attendAt: navigationData.attendAt || 'Not scheduled',
+              attendBy: navigationData.attendBy || 'Not assigned',
+            };
+            setMaintenanceDetails(enhancedData);
+          } else if (maintenanceItem) {
+            // Enhance maintenance item data with better defaults
+            const enhancedData = {
+              ...maintenanceItem,
+              amcRef: maintenanceItem.amcRef || `AMC${maintenanceId}`,
+              siteId: maintenanceItem.siteId || `SITE${maintenanceId}`,
+              siteName: maintenanceItem.siteName || `Site ${maintenanceId}`,
+              siteAddress: maintenanceItem.siteAddress || 'Address not specified',
+              serviceDate: maintenanceItem.serviceDate || 'Date not specified',
+              month: maintenanceItem.month || 'Month not specified',
+              siteCity: maintenanceItem.siteCity || 'City not specified',
+              status: (maintenanceItem.status || 'all').toLowerCase(),
+              blockWing: maintenanceItem.blockWing || 'Not specified',
+              attendAt: maintenanceItem.attendAt || 'Not scheduled',
+              attendBy: maintenanceItem.attendBy || 'Not assigned',
+            };
+            setMaintenanceDetails(enhancedData);
           }
         }
       }
     } catch (error) {
       console.error('Error loading maintenance details:', error);
-      // Use navigation data as fallback
+      // Use navigation data as fallback with better defaults
       if (navigationData) {
-        setMaintenanceDetails(navigationData);
+        const maintenanceId = navigationData?.id;
+        const enhancedData = {
+          ...navigationData,
+          amcRef: navigationData.amcRef || (maintenanceId ? `AMC${maintenanceId}` : 'N/A'),
+          siteId: navigationData.siteId || (maintenanceId ? `SITE${maintenanceId}` : 'N/A'),
+          siteName: navigationData.siteName || (maintenanceId ? `Site ${maintenanceId}` : 'N/A'),
+          siteAddress: navigationData.siteAddress || 'Address not specified',
+          serviceDate: navigationData.serviceDate || 'Date not specified',
+          month: navigationData.month || 'Month not specified',
+          siteCity: navigationData.siteCity || 'City not specified',
+          status: (navigationData.status || 'all').toLowerCase(),
+          blockWing: navigationData.blockWing || 'Not specified',
+          attendAt: navigationData.attendAt || 'Not scheduled',
+          attendBy: navigationData.attendBy || 'Not assigned',
+        };
+        setMaintenanceDetails(enhancedData);
+      } else if (maintenanceItem) {
+        const maintenanceId = maintenanceItem?.id;
+        const enhancedData = {
+          ...maintenanceItem,
+          amcRef: maintenanceItem.amcRef || (maintenanceId ? `AMC${maintenanceId}` : 'N/A'),
+          siteId: maintenanceItem.siteId || (maintenanceId ? `SITE${maintenanceId}` : 'N/A'),
+          siteName: maintenanceItem.siteName || (maintenanceId ? `Site ${maintenanceId}` : 'N/A'),
+          siteAddress: maintenanceItem.siteAddress || 'Address not specified',
+          serviceDate: maintenanceItem.serviceDate || 'Date not specified',
+          month: maintenanceItem.month || 'Month not specified',
+          siteCity: maintenanceItem.siteCity || 'City not specified',
+          status: (maintenanceItem.status || 'all').toLowerCase(),
+          blockWing: maintenanceItem.blockWing || 'Not specified',
+          attendAt: maintenanceItem.attendAt || 'Not scheduled',
+          attendBy: maintenanceItem.attendBy || 'Not assigned',
+        };
+        setMaintenanceDetails(enhancedData);
       }
     } finally {
       setIsLoading(false);
@@ -213,7 +288,7 @@ const MaintenanceDetailsPage: React.FC<MaintenanceDetailsPageProps> = ({ mainten
       dueAmount: 0.00,
       agreementUrl: 'https://example.com/amc-agreement.pdf', // Replace with actual URL
     };
-    
+
     navigateTo('/amc-contracts', contractData);
   };
 
@@ -223,32 +298,38 @@ const MaintenanceDetailsPage: React.FC<MaintenanceDetailsPageProps> = ({ mainten
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
+    const normalizedStatus = status?.toLowerCase() || '';
+    switch (normalizedStatus) {
       case 'completed':
-        return '#FF6B6B';
+        return '#4CAF50'; // Green
       case 'due':
-        return '#FF9800';
+        return '#FF9800'; // Orange
       case 'overdue':
-        return '#F44336';
+        return '#F44336'; // Red
       case 'in progress':
-        return '#2196F3';
+      case 'inprogress':
+      case 'in-progress':
+        return '#2196F3'; // Blue
+      case 'all':
+      case 'pending':
+        return '#9E9E9E'; // Gray
       default:
-        return '#666666';
+        return '#666666'; // Dark gray
     }
   };
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#FF6B6B" />
-      
+
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={handleBack}>
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
-        
+
         <Text style={styles.headerTitle}>Routine Maintenance</Text>
-        
+
         <View style={styles.headerRight}>
           {/* Empty space for balance */}
         </View>
@@ -264,131 +345,131 @@ const MaintenanceDetailsPage: React.FC<MaintenanceDetailsPageProps> = ({ mainten
           <>
             {/* AMC Reference Section */}
             <View style={styles.amcSection}>
-          <View style={styles.amcLeft}>
-            <Text style={styles.amcLabel}>AMC Ref.</Text>
-            <Text style={styles.amcValue}>{maintenanceDetails.amcRef || 'N/A'}</Text>
-          </View>
-          <View style={styles.amcRight}>
-            <TouchableOpacity style={styles.iconButton} onPress={handleViewPDF}>
-              <Text style={styles.iconText}>📄</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.iconButton} onPress={handleShare}>
-              <Text style={styles.iconText}>📤</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+              <View style={styles.amcLeft}>
+                <Text style={styles.amcLabel}>AMC Ref.</Text>
+                <Text style={styles.amcValue}>{maintenanceDetails.amcRef}</Text>
+              </View>
+              <View style={styles.amcRight}>
+                <TouchableOpacity style={styles.iconButton} onPress={handleViewPDF}>
+                  <Text style={styles.iconText}>📄</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.iconButton} onPress={handleShare}>
+                  <Text style={styles.iconText}>📤</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
 
-        {/* Site Information Section */}
-        <View style={styles.siteSection}>
-          <View style={styles.siteHeader}>
-            <Text style={styles.siteIcon}>🏢</Text>
-            <View style={styles.siteInfo}>
-              <Text style={styles.siteId}>{maintenanceDetails.siteId || 'N/A'}</Text>
-              <Text style={styles.siteName}>{maintenanceDetails.siteName || 'N/A'}</Text>
+            {/* Site Information Section */}
+            <View style={styles.siteSection}>
+              <View style={styles.siteHeader}>
+                <Text style={styles.siteIcon}>🏢</Text>
+                <View style={styles.siteInfo}>
+                  <Text style={styles.siteId}>{maintenanceDetails.siteId}</Text>
+                  <Text style={styles.siteName}>{maintenanceDetails.siteName}</Text>
+                </View>
+              </View>
+              <TouchableOpacity style={styles.addressContainer} onPress={handleAddressPress}>
+                <Text style={styles.addressText}>{maintenanceDetails.siteAddress}</Text>
+                <Text style={styles.externalLinkIcon}>🔗</Text>
+              </TouchableOpacity>
             </View>
-          </View>
-          <TouchableOpacity style={styles.addressContainer} onPress={handleAddressPress}>
-            <Text style={styles.addressText}>{maintenanceDetails.siteAddress || 'Address not available'}</Text>
-            <Text style={styles.externalLinkIcon}>🔗</Text>
-          </TouchableOpacity>
-        </View>
 
-        {/* Service Details Section */}
-        <View style={styles.serviceSection}>
-          <View style={styles.serviceRow}>
-            <View style={styles.serviceLeft}>
-              <Text style={styles.serviceDateLabel}>Service Date:</Text>
-              <Text style={styles.serviceDateValue}>{maintenanceDetails.serviceDate || 'N/A'}</Text>
-              <Text style={styles.monthText}>{maintenanceDetails.month || 'N/A'}</Text>
-            </View>
-            
-            <View style={styles.timelineContainer}>
-              <View style={styles.timelineDot} />
-              <View style={styles.timelineLine} />
-              <View style={[styles.timelineDot, styles.timelineDotFilled]} />
-            </View>
-            
-            <View style={styles.serviceRight}>
-              <Text style={styles.siteCityLabel}>Site City:</Text>
-              <Text style={styles.siteCityValue}>{maintenanceDetails.siteCity || 'N/A'}</Text>
-            </View>
-          </View>
+            {/* Service Details Section */}
+            <View style={styles.serviceSection}>
+              <View style={styles.serviceRow}>
+                <View style={styles.serviceLeft}>
+                  <Text style={styles.serviceDateLabel}>Service Date:</Text>
+                  <Text style={styles.serviceDateValue}>{maintenanceDetails.serviceDate}</Text>
+                  <Text style={styles.monthText}>{maintenanceDetails.month}</Text>
+                </View>
 
-          <View style={styles.detailsRow}>
-            <View style={styles.detailsLeft}>
-              <Text style={styles.statusLabel}>Status:</Text>
-              <Text style={[styles.statusValue, { color: getStatusColor(maintenanceDetails.status) }]}>
-                {maintenanceDetails.status || 'N/A'}
-              </Text>
-            </View>
-            <View style={styles.detailsRight}>
-              <Text style={styles.blockLabel}>Block / Wing:</Text>
-              <Text style={styles.blockValue}>{maintenanceDetails.blockWing || 'N/A'}</Text>
-            </View>
-          </View>
+                <View style={styles.timelineContainer}>
+                  <View style={styles.timelineDot} />
+                  <View style={styles.timelineLine} />
+                  <View style={[styles.timelineDot, styles.timelineDotFilled]} />
+                </View>
 
-          <View style={styles.detailsRow}>
-            <View style={styles.detailsLeft}>
-              <Text style={styles.attendLabel}>Attend By:</Text>
-              <Text style={styles.attendValue}>{maintenanceDetails.attendBy || 'Not assigned'}</Text>
-            </View>
-            <View style={styles.detailsRight}>
-              <Text style={styles.attendAtLabel}>Attend At:</Text>
-              <Text style={styles.attendAtValue}>{maintenanceDetails.attendAt || 'Not scheduled'}</Text>
-            </View>
-          </View>
-        </View>
+                <View style={styles.serviceRight}>
+                  <Text style={styles.siteCityLabel}>Site City:</Text>
+                  <Text style={styles.siteCityValue}>{maintenanceDetails.siteCity}</Text>
+                </View>
+              </View>
 
-        {/* Expandable Sections */}
-        <View style={styles.expandableSection}>
-          <TouchableOpacity 
-            style={styles.expandableHeader}
-            onPress={() => setIsRoutineServiceExpanded(!isRoutineServiceExpanded)}
-          >
-            <View style={styles.expandableLeft}>
-              <Text style={styles.expandableIcon}>💼</Text>
-              <Text style={styles.expandableTitle}>Routine Service Info</Text>
-            </View>
-            <Text style={styles.expandableChevron}>
-              {isRoutineServiceExpanded ? '▲' : '▼'}
-            </Text>
-          </TouchableOpacity>
-          
-          {isRoutineServiceExpanded && (
-            <View style={styles.expandableContent}>
-              <Text style={styles.expandableText}>
-                Detailed routine service information will be displayed here.
-                This could include service history, next scheduled maintenance,
-                equipment details, and other relevant information.
-              </Text>
-            </View>
-          )}
-        </View>
+              <View style={styles.detailsRow}>
+                <View style={styles.detailsLeft}>
+                  <Text style={styles.statusLabel}>Status:</Text>
+                  <Text style={[styles.statusValue, { color: getStatusColor(maintenanceDetails.status) }]}>
+                    {maintenanceDetails.status}
+                  </Text>
+                </View>
+                <View style={styles.detailsRight}>
+                  <Text style={styles.blockLabel}>Block / Wing:</Text>
+                  <Text style={styles.blockValue}>{maintenanceDetails.blockWing}</Text>
+                </View>
+              </View>
 
-        <View style={styles.expandableSection}>
-          <TouchableOpacity 
-            style={styles.expandableHeader}
-            onPress={() => setIsMaterialInfoExpanded(!isMaterialInfoExpanded)}
-          >
-            <View style={styles.expandableLeft}>
-              <Text style={styles.expandableIcon}>🛒</Text>
-              <Text style={styles.expandableTitle}>Material Info</Text>
+              <View style={styles.detailsRow}>
+                <View style={styles.detailsLeft}>
+                  <Text style={styles.attendLabel}>Attend By:</Text>
+                  <Text style={styles.attendValue}>{maintenanceDetails.attendBy}</Text>
+                </View>
+                <View style={styles.detailsRight}>
+                  <Text style={styles.attendAtLabel}>Attend At:</Text>
+                  <Text style={styles.attendAtValue}>{maintenanceDetails.attendAt}</Text>
+                </View>
+              </View>
             </View>
-            <Text style={styles.expandableChevron}>
-              {isMaterialInfoExpanded ? '▲' : '▼'}
-            </Text>
-          </TouchableOpacity>
-          
-          {isMaterialInfoExpanded && (
-            <View style={styles.expandableContent}>
-              <Text style={styles.expandableText}>
-                Material information will be displayed here.
-                This could include parts used, materials required,
-                inventory status, and procurement details.
-              </Text>
+
+            {/* Expandable Sections */}
+            <View style={styles.expandableSection}>
+              <TouchableOpacity
+                style={styles.expandableHeader}
+                onPress={() => setIsRoutineServiceExpanded(!isRoutineServiceExpanded)}
+              >
+                <View style={styles.expandableLeft}>
+                  <Text style={styles.expandableIcon}>💼</Text>
+                  <Text style={styles.expandableTitle}>Routine Service Info</Text>
+                </View>
+                <Text style={styles.expandableChevron}>
+                  {isRoutineServiceExpanded ? '▲' : '▼'}
+                </Text>
+              </TouchableOpacity>
+
+              {isRoutineServiceExpanded && (
+                <View style={styles.expandableContent}>
+                  <Text style={styles.expandableText}>
+                    Detailed routine service information will be displayed here.
+                    This could include service history, next scheduled maintenance,
+                    equipment details, and other relevant information.
+                  </Text>
+                </View>
+              )}
             </View>
-          )}
-        </View>
+
+            <View style={styles.expandableSection}>
+              <TouchableOpacity
+                style={styles.expandableHeader}
+                onPress={() => setIsMaterialInfoExpanded(!isMaterialInfoExpanded)}
+              >
+                <View style={styles.expandableLeft}>
+                  <Text style={styles.expandableIcon}>🛒</Text>
+                  <Text style={styles.expandableTitle}>Material Info</Text>
+                </View>
+                <Text style={styles.expandableChevron}>
+                  {isMaterialInfoExpanded ? '▲' : '▼'}
+                </Text>
+              </TouchableOpacity>
+
+              {isMaterialInfoExpanded && (
+                <View style={styles.expandableContent}>
+                  <Text style={styles.expandableText}>
+                    Material information will be displayed here.
+                    This could include parts used, materials required,
+                    inventory status, and procurement details.
+                  </Text>
+                </View>
+              )}
+            </View>
           </>
         )}
       </ScrollView>
