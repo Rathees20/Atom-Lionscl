@@ -24,6 +24,12 @@ export const API_ENDPOINTS = {
   ROUTINE_SERVICES: `${API_BASE_URL}/routine-services/api/mobile/routine-services/`,
   ROUTINE_SERVICES_ALL: `${API_BASE_URL}/routine-services/api/mobile/routine-services/all/`,
   ROUTINE_SERVICES_DOWNLOAD_SLIP: `${API_BASE_URL}/routine-services/api/mobile/download-service-slip`,
+// Customer sub-customers
+  CREATE_SUB_CUSTOMER: `${API_BASE_URL}/subcustomer/api/create/`,
+  LIST_SUB_CUSTOMERS: `${API_BASE_URL}/subcustomer/api/list/`,
+  SUB_CUSTOMER_DETAIL: (subCustomerId: string | number) => `${API_BASE_URL}/subcustomer/api/${subCustomerId}/`,
+  UPDATE_SUB_CUSTOMER: (subCustomerId: string | number) => `${API_BASE_URL}/subcustomer/api/${subCustomerId}/update/`,
+  DELETE_SUB_CUSTOMER: (subCustomerId: string | number) => `${API_BASE_URL}/subcustomer/api/${subCustomerId}/delete/`,
 };
 
 export default API_BASE_URL;

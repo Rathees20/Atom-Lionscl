@@ -11,7 +11,7 @@ export type Route =
   | 'amc-contracts'
   | 'invoice'
   | 'quotation'
-  | 'profile-switch'
+
   | 'about-us'
   | 'create-user';
 
@@ -30,7 +30,7 @@ const isValidRoute = (value: string): value is Route => {
     'amc-contracts',
     'invoice',
     'quotation',
-    'profile-switch',
+
     'about-us',
     'create-user',
   ].includes(value);

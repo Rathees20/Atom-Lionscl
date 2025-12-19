@@ -33,7 +33,7 @@ interface SideMenuProps {
   onNavigateToAMCContracts?: () => void;
   onNavigateToInvoice?: () => void;
   onNavigateToQuotation?: () => void;
-  onNavigateToProfileSwitch?: () => void;
+
   onNavigateToAboutUs?: () => void;
   onNavigateToCreateUser?: () => void;
 }
@@ -49,7 +49,6 @@ const SideMenu: React.FC<SideMenuProps> = ({
   onNavigateToAMCContracts,
   onNavigateToInvoice,
   onNavigateToQuotation,
-  onNavigateToProfileSwitch,
   onNavigateToAboutUs,
   onNavigateToCreateUser,
 }) => {
@@ -61,7 +60,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
     quotation: require('../assets/Quatation.png'),
     invoice: require('../assets/invoice.png'),
     aboutUs: require('../assets/About us.png'),
-    switchProfile: require('../assets/Switch profile.png'),
+
     logout: require('../assets/logout.png'),
   };
   const telephoneIcon = require('../assets/telephone.png');
@@ -144,17 +143,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
         }
       },
     },
-    {
-      id: 'switch-profile',
-      title: 'Switch Profile',
-      icon: menuIcons.switchProfile,
-      onPress: () => {
-        if (onNavigateToProfileSwitch) {
-          onNavigateToProfileSwitch();
-        }
-        onClose();
-      },
-    },
+
     {
       id: 'create-user',
       title: 'Create User',
@@ -195,6 +184,11 @@ const SideMenu: React.FC<SideMenuProps> = ({
   const siteName = userData?.site_name || userData?.siteName || 'Customer';
   const phoneNumber = userData?.mobile || userData?.phone || userData?.mobileNumber || '';
 
+  // Filter out Create User menu item for sub-users
+  const filteredMenuItems = userData?.is_subcustomer 
+    ? menuItems.filter(item => item.id !== 'create-user')
+    : menuItems;
+  
   return (
     <Modal
       visible={visible}
@@ -211,13 +205,13 @@ const SideMenu: React.FC<SideMenuProps> = ({
               <View style={styles.patternShape2} />
               <View style={styles.patternShape3} />
             </View>
-            
+              
             <View style={styles.userInfo}>
               <View style={styles.userItem}>
                 <Text style={styles.userIcon}>👤</Text>
                 <Text style={styles.userText}>{siteName}</Text>
               </View>
-              
+                
               {phoneNumber && (
                 <View style={styles.userItem}>
                   <Image source={telephoneIcon} style={styles.userIconImage} resizeMode="contain" />
@@ -228,10 +222,10 @@ const SideMenu: React.FC<SideMenuProps> = ({
               )}
             </View>
           </View>
-
+  
           {/* Menu Items */}
           <ScrollView style={styles.menuContent} showsVerticalScrollIndicator={false}>
-            {menuItems.map((item, index) => (
+            {filteredMenuItems.map((item, index) => (
               <TouchableOpacity
                 key={item.id}
                 style={styles.menuItem}

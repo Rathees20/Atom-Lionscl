@@ -11,7 +11,7 @@ import MaintenanceDetailsPage from '../screens/MaintenanceDetailsPage';
 import AMCContractsPage from '../screens/AMCContractsPage';
 import InvoicePage from '../screens/InvoicePage';
 import QuotationPage from '../screens/QuotationPage';
-import ProfileSwitchPage from '../screens/ProfileSwitchPage';
+
 import AboutUsPage from '../screens/AboutUsPage';
 import CreateUserPage from '../screens/CreateUserPage';
 
@@ -26,7 +26,7 @@ const PROTECTED_ROUTES = [
   'amc-contracts',
   'invoice',
   'quotation',
-  'profile-switch',
+
   'about-us',
   'create-user',
 ];
@@ -83,11 +83,15 @@ const AppRouter: React.FC = () => {
         return <InvoicePage />;
       case 'quotation':
         return <QuotationPage />;
-      case 'profile-switch':
-        return <ProfileSwitchPage />;
+
       case 'about-us':
         return <AboutUsPage />;
       case 'create-user':
+        // Prevent sub-users from accessing the Create User page
+        if (user?.is_subcustomer) {
+          // Redirect sub-users to dashboard
+          return <DashboardPage />;
+        }
         return <CreateUserPage />;
       default:
         // If no user and default route, show login

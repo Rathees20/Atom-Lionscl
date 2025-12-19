@@ -9,31 +9,33 @@ import {
   TextInput,
   ScrollView,
   StatusBar,
-  Alert,
   KeyboardAvoidingView,
+  Switch,
+  ActivityIndicator,
+  Image,
 } from 'react-native';
 import { useNavigation } from '../contexts/NavigationContext';
-import { Image } from 'react-native';
+import { API_ENDPOINTS } from '../utils/api';
+import { CustomAlert } from '../utils/alerts';
 
 const { width, height } = Dimensions.get('window');
 const isWeb = Platform.OS === 'web';
 
 const CreateUserPage: React.FC = () => {
-  const { navigateTo } = useNavigation();
+  const { navigateTo, user } = useNavigation();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    mobile: '',
-    password: '',
-    confirmPassword: '',
-    role: '',
-    siteName: '',
-    siteAddress: '',
-    city: '',
-    state: '',
-    pinCode: '',
+    phone: '',
+    canAccessApp: true,
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [alert, setAlert] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    type: 'info', // 'success', 'error', 'warning', 'info'
+  });
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
@@ -45,100 +47,170 @@ const CreateUserPage: React.FC = () => {
   const handleSubmit = async () => {
     // Validation
     if (!formData.name.trim()) {
-      Alert.alert('Error', 'Please enter name');
+      setAlert({
+        visible: true,
+        title: 'Error',
+        message: 'Please enter name',
+        type: 'error'
+      });
       return;
     }
 
     if (!formData.email.trim()) {
-      Alert.alert('Error', 'Please enter email');
+      setAlert({
+        visible: true,
+        title: 'Error',
+        message: 'Please enter email',
+        type: 'error'
+      });
       return;
     }
 
-    if (!formData.mobile.trim() || formData.mobile.length !== 10) {
-      Alert.alert('Error', 'Please enter a valid 10-digit mobile number');
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email.trim())) {
+      setAlert({
+        visible: true,
+        title: 'Error',
+        message: 'Please enter a valid email address',
+        type: 'error'
+      });
       return;
     }
 
-    if (!formData.password.trim() || formData.password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+    // Phone validation (if provided)
+    if (formData.phone.trim() && formData.phone.length !== 10) {
+      setAlert({
+        visible: true,
+        title: 'Error',
+        message: 'Please enter a valid 10-digit phone number',
+        type: 'error'
+      });
       return;
     }
 
-    if (formData.password !== formData.confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
-      return;
-    }
-
-    if (!formData.role.trim()) {
-      Alert.alert('Error', 'Please select a role');
+    // Check if customer is logged in
+    if (!user?.email) {
+      setAlert({
+        visible: true,
+        title: 'Error',
+        message: 'Please login to create sub-customers',
+        type: 'error'
+      });
       return;
     }
 
     setIsLoading(true);
-    
-    // TODO: API call will be added here later
-    // For now, just show success message
-    setTimeout(() => {
-      setIsLoading(false);
-      Alert.alert('Success', 'User created successfully!', [
-        {
-          text: 'OK',
-          onPress: () => {
-            // Reset form
-            setFormData({
-              name: '',
-              email: '',
-              mobile: '',
-              password: '',
-              confirmPassword: '',
-              role: '',
-              siteName: '',
-              siteAddress: '',
-              city: '',
-              state: '',
-              pinCode: '',
-            });
-            navigateTo('/dashboard');
-          },
+
+    try {
+      const requestBody: any = {
+        customer_email: user.email,
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        can_access_app: formData.canAccessApp,
+      };
+
+      // Add optional fields if provided
+      if (formData.phone.trim()) {
+        requestBody.phone = formData.phone.trim();
+      }
+
+      const response = await fetch(API_ENDPOINTS.CREATE_SUB_CUSTOMER, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-      ]);
-    }, 1000);
+        body: JSON.stringify(requestBody),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setAlert({
+          visible: true,
+          title: 'Success',
+          message: data.message || 'Sub-customer created successfully!',
+          type: 'success'
+        });
+        // Reset form
+        setFormData({
+          name: '',
+          email: '',
+          phone: '',
+          canAccessApp: true,
+        });
+      } else {
+        setAlert({
+          visible: true,
+          title: 'Error',
+          message: data.error || 'Failed to create sub-customer. Please try again.',
+          type: 'error'
+        });
+      }
+    } catch (error) {
+      console.error('Error creating sub-customer:', error);
+      setAlert({
+        visible: true,
+        title: 'Error',
+        message: 'Network error. Please check your connection and try again.',
+        type: 'error'
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleBack = () => {
     navigateTo('/dashboard');
   };
 
+  const closeAlert = () => {
+    setAlert({
+      ...alert,
+      visible: false
+    });
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#FF6B6B" />
-      
+
+      <CustomAlert
+        visible={alert.visible}
+        title={alert.title}
+        message={alert.message}
+        buttons={[{ text: 'OK', onPress: closeAlert }]}
+        onClose={closeAlert}
+      />
+
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-          <Image 
-            source={require('../assets/left-chevron.png')} 
+          <Image
+            source={require('../assets/left-chevron.png')}
             style={styles.backIcon}
             resizeMode="contain"
           />
         </TouchableOpacity>
-        
+
         <Text style={styles.headerTitle}>Create User</Text>
-        
-        <TouchableOpacity 
-          style={styles.submitButton}
+
+        <TouchableOpacity
+          style={[styles.submitButton, isLoading && styles.submitButtonDisabled]}
           onPress={handleSubmit}
           disabled={isLoading}
         >
-          <Text style={styles.submitText}>
-            {isLoading ? 'CREATING...' : 'CREATE'}
-          </Text>
+          {isLoading ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <Text style={styles.submitText}>CREATE</Text>
+          )}
         </TouchableOpacity>
       </View>
 
       {/* Form Content */}
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <ScrollView 
+        <ScrollView
           style={styles.content}
           contentContainerStyle={{ paddingBottom: 40 }}
           keyboardShouldPersistTaps="handled"
@@ -146,13 +218,14 @@ const CreateUserPage: React.FC = () => {
         >
           {/* Name */}
           <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Name *</Text>
+            <Text style={styles.inputLabel}>Full Name *</Text>
             <TextInput
               style={styles.textInput}
               value={formData.name}
               onChangeText={(value) => handleInputChange('name', value)}
-              placeholder="Enter name"
+              placeholder="Enter full name"
               placeholderTextColor="#999999"
+              autoFocus
             />
             <View style={styles.inputUnderline} />
           </View>
@@ -164,7 +237,7 @@ const CreateUserPage: React.FC = () => {
               style={styles.textInput}
               value={formData.email}
               onChangeText={(value) => handleInputChange('email', value)}
-              placeholder="Enter email"
+              placeholder="Enter email address"
               placeholderTextColor="#999999"
               keyboardType="email-address"
               autoCapitalize="none"
@@ -172,131 +245,40 @@ const CreateUserPage: React.FC = () => {
             <View style={styles.inputUnderline} />
           </View>
 
-          {/* Mobile */}
+          {/* Phone */}
           <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Mobile Number *</Text>
+            <Text style={styles.inputLabel}>Phone Number</Text>
             <View style={styles.mobileInputWrapper}>
               <TextInput
                 style={styles.mobileTextInput}
-                value={formData.mobile}
-                onChangeText={(value) => handleInputChange('mobile', value)}
-                placeholder="Enter mobile number"
+                value={formData.phone}
+                onChangeText={(value) => handleInputChange('phone', value.replace(/[^0-9]/g, ''))}
+                placeholder="Enter phone number (optional)"
                 placeholderTextColor="#999999"
                 keyboardType={Platform.OS === 'ios' ? 'number-pad' : 'phone-pad'}
                 maxLength={10}
               />
-              <Text style={styles.characterCount}>{formData.mobile.length}/10</Text>
+              {formData.phone.length > 0 && (
+                <Text style={styles.characterCount}>{formData.phone.length}/10</Text>
+              )}
             </View>
             <View style={styles.inputUnderline} />
           </View>
 
-          {/* Password */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Password *</Text>
-            <TextInput
-              style={styles.textInput}
-              value={formData.password}
-              onChangeText={(value) => handleInputChange('password', value)}
-              placeholder="Enter password"
-              placeholderTextColor="#999999"
-              secureTextEntry
+          {/* Can Access App Toggle */}
+          <View style={styles.switchContainer}>
+            <View style={styles.switchLabelContainer}>
+              <Text style={styles.switchLabel}>Allow Access to Mobile App</Text>
+              <Text style={styles.switchDescription}>
+                Enable this to allow the sub-customer to login and access the customer mobile app
+              </Text>
+            </View>
+            <Switch
+              value={formData.canAccessApp}
+              onValueChange={(value) => handleInputChange('canAccessApp', value)}
+              trackColor={{ false: '#E0E0E0', true: '#FF6B6B' }}
+              thumbColor={formData.canAccessApp ? '#FFFFFF' : '#F4F3F4'}
             />
-            <View style={styles.inputUnderline} />
-          </View>
-
-          {/* Confirm Password */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Confirm Password *</Text>
-            <TextInput
-              style={styles.textInput}
-              value={formData.confirmPassword}
-              onChangeText={(value) => handleInputChange('confirmPassword', value)}
-              placeholder="Confirm password"
-              placeholderTextColor="#999999"
-              secureTextEntry
-            />
-            <View style={styles.inputUnderline} />
-          </View>
-
-          {/* Role */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Role *</Text>
-            <TextInput
-              style={styles.textInput}
-              value={formData.role}
-              onChangeText={(value) => handleInputChange('role', value)}
-              placeholder="Enter role (e.g., Admin, User, Manager)"
-              placeholderTextColor="#999999"
-            />
-            <View style={styles.inputUnderline} />
-          </View>
-
-          {/* Site Name */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Site Name</Text>
-            <TextInput
-              style={styles.textInput}
-              value={formData.siteName}
-              onChangeText={(value) => handleInputChange('siteName', value)}
-              placeholder="Enter site name"
-              placeholderTextColor="#999999"
-            />
-            <View style={styles.inputUnderline} />
-          </View>
-
-          {/* Site Address */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Site Address</Text>
-            <TextInput
-              style={styles.textInput}
-              value={formData.siteAddress}
-              onChangeText={(value) => handleInputChange('siteAddress', value)}
-              placeholder="Enter site address"
-              placeholderTextColor="#999999"
-              multiline
-            />
-            <View style={styles.inputUnderline} />
-          </View>
-
-          {/* City */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>City</Text>
-            <TextInput
-              style={styles.textInput}
-              value={formData.city}
-              onChangeText={(value) => handleInputChange('city', value)}
-              placeholder="Enter city"
-              placeholderTextColor="#999999"
-            />
-            <View style={styles.inputUnderline} />
-          </View>
-
-          {/* State */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>State</Text>
-            <TextInput
-              style={styles.textInput}
-              value={formData.state}
-              onChangeText={(value) => handleInputChange('state', value)}
-              placeholder="Enter state"
-              placeholderTextColor="#999999"
-            />
-            <View style={styles.inputUnderline} />
-          </View>
-
-          {/* Pin Code */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Pin Code</Text>
-            <TextInput
-              style={styles.textInput}
-              value={formData.pinCode}
-              onChangeText={(value) => handleInputChange('pinCode', value)}
-              placeholder="Enter pin code"
-              placeholderTextColor="#999999"
-              keyboardType="numeric"
-              maxLength={6}
-            />
-            <View style={styles.inputUnderline} />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -386,6 +368,31 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: '#E0E0E0',
     marginTop: 5,
+  },
+  submitButtonDisabled: {
+    opacity: 0.6,
+  },
+  switchContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 25,
+    paddingVertical: 10,
+  },
+  switchLabelContainer: {
+    flex: 1,
+    marginRight: 15,
+  },
+  switchLabel: {
+    fontSize: 16,
+    color: '#333333',
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  switchDescription: {
+    fontSize: 12,
+    color: '#666666',
+    lineHeight: 16,
   },
 });
 

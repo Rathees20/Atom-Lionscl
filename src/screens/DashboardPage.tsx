@@ -9,6 +9,7 @@ import {
   ScrollView,
   StatusBar,
   Alert,
+  Linking,
 } from 'react-native';
 import SideMenu from '../components/SideMenu';
 import { useNavigation } from '../contexts/NavigationContext';
@@ -32,18 +33,18 @@ interface AMCSummary {
 
 interface RoutineService {
   lastService?: {
-    id?: string;
     date: string;
     duration: string;
     technician: string;
     code: string;
+    service_slip_url?: string | null;
   };
   upcomingService?: {
-    id?: string;
     date: string;
     duration: string;
     technician: string;
     code: string;
+    service_slip_url?: string | null;
   };
 }
 
@@ -54,26 +55,14 @@ const DashboardPage: React.FC = () => {
   const [isLoadingAMC, setIsLoadingAMC] = useState(true);
   const [routineService, setRoutineService] = useState<RoutineService | null>(null);
   const [isLoadingRoutine, setIsLoadingRoutine] = useState(true);
+  const [serviceSlipUrl, setServiceSlipUrl] = useState<string | null>(null);
+  const [lastServiceId, setLastServiceId] = useState<string | number | null>(null);
+  const [isAmcService, setIsAmcService] = useState<boolean>(false);
 
   useEffect(() => {
     loadAMCData();
     loadRoutineServices();
   }, []);
-
-  // Helper function to safely get string values
-  const safeGetString = (value: any): string => {
-    if (value === null || value === undefined) return 'N/A';
-    if (typeof value === 'object') return JSON.stringify(value);
-    return String(value);
-  };
-
-  // Helper function to safely get number values
-  const safeGetNumber = (value: any): number => {
-    if (value === null || value === undefined) return 0;
-    if (typeof value === 'object') return 0;
-    const num = parseFloat(String(value));
-    return isNaN(num) ? 0 : num;
-  };
 
   const loadAMCData = async () => {
     try {
@@ -87,8 +76,6 @@ const DashboardPage: React.FC = () => {
 
       const url = `${API_ENDPOINTS.CUSTOMER_AMCS}?email=${encodeURIComponent(userEmail)}`;
 
-      console.log('Fetching AMC data from:', url);
-
       const response = await fetch(url, {
         method: 'GET',
         headers: {
@@ -98,75 +85,32 @@ const DashboardPage: React.FC = () => {
 
       const data = await response.json();
 
-      console.log('AMC API response:', data);
-
       if (response.ok) {
-        // Handle different response formats
-        let amcsData = [];
-
-        if (Array.isArray(data)) {
-          amcsData = data;
-        } else if (data.amcs) {
-          amcsData = data.amcs;
-        } else if (data.contracts) {
-          amcsData = data.contracts;
-        } else if (data.results) {
-          amcsData = data.results;
-        } else if (data.data) {
-          amcsData = data.data;
-        } else {
-          // If none of the above, treat the whole response as a single contract
-          amcsData = [data];
-        }
-
-        console.log('Processing AMC data:', amcsData);
+        const amcs = Array.isArray(data) ? data : (data.amcs || data.contracts || data.results || []);
 
         const summary: AMCSummary = {
-          totalContracts: amcsData.length,
-          activeContracts: amcsData.filter((item: any) =>
-            (safeGetString(item.status).toLowerCase() === 'active')
+          totalContracts: amcs.length,
+          activeContracts: amcs.filter((item: any) =>
+            (item.status || '').toLowerCase() === 'active'
           ).length,
-          totalAmount: amcsData.reduce((sum: number, item: any) =>
-            sum + safeGetNumber(item.contract_amount || item.contractAmount || item.amount || item.total), 0
+          totalAmount: amcs.reduce((sum: number, item: any) =>
+            sum + (parseFloat(item.contract_amount || item.contractAmount || '0') || 0), 0
           ),
-          paidAmount: amcsData.reduce((sum: number, item: any) =>
-            sum + safeGetNumber(item.paid_amount || item.paidAmount || item.paid), 0
+          paidAmount: amcs.reduce((sum: number, item: any) =>
+            sum + (parseFloat(item.paid_amount || item.paidAmount || '0') || 0), 0
           ),
-          dueAmount: amcsData.reduce((sum: number, item: any) =>
-            sum + safeGetNumber(item.due_amount || item.dueAmount || item.due), 0
+          dueAmount: amcs.reduce((sum: number, item: any) =>
+            sum + (parseFloat(item.due_amount || item.dueAmount || '0') || 0), 0
           ),
-          latestContract: (() => {
-            // Find the most recent contract based on date or ID
-            if (amcsData.length === 0) return undefined;
-
-            // Try to find a contract with a valid date or ID
-            const validContracts = amcsData.filter((item: any) =>
-              (item.start_date || item.startDate || item.created_at || item.createdAt || item.id)
-            );
-
-            if (validContracts.length > 0) {
-              // For now, just take the first valid contract
-              // In a real app, you might sort by date
-              const latest = validContracts[0];
-              return {
-                contractId: safeGetString(latest.contract_id || latest.contractId || latest.amc_id || latest.id || 'N/A'),
-                status: safeGetString(latest.status || 'N/A'),
-                period: safeGetString(latest.period || latest.contract_period || latest.Period ||
-                  (latest.start_date && latest.end_date ?
-                    `${safeGetString(latest.start_date)} - ${safeGetString(latest.end_date)}` :
-                    (latest.startDate && latest.endDate ?
-                      `${safeGetString(latest.startDate)} - ${safeGetString(latest.endDate)}` : 'N/A'))),
-              };
-            }
-
-            return undefined;
-          })(),
+          latestContract: amcs.length > 0 ? {
+            contractId: amcs[0].contract_id || amcs[0].contractId || amcs[0].amc_id?.toString() || 'N/A',
+            status: amcs[0].status || 'N/A',
+            period: amcs[0].period || amcs[0].contract_period ||
+              (amcs[0].start_date && amcs[0].end_date ? `${amcs[0].start_date} - ${amcs[0].end_date}` : 'N/A'),
+          } : undefined,
         };
 
-        console.log('AMC Summary:', summary);
         setAmcSummary(summary);
-      } else {
-        console.error('Error loading AMC data:', data.error || data.message || response.statusText);
       }
     } catch (error) {
       console.error('Error loading AMC data:', error);
@@ -174,7 +118,6 @@ const DashboardPage: React.FC = () => {
       setIsLoadingAMC(false);
     }
   };
-
 
   const handleMenuPress = () => {
     setIsMenuVisible(true);
@@ -264,21 +207,57 @@ const DashboardPage: React.FC = () => {
         console.log('ServicesData keys:', Object.keys(servicesData || {}));
 
         // Extract last service data - check for nested objects or flat structure
-        const lastServiceData = servicesData.last_service ||
+        // API returns: { last_service: {...}, upcoming_service: {...} }
+        const lastServiceData = data.last_service ||
+          servicesData.last_service ||
           servicesData.lastService ||
           servicesData.last ||
           servicesData;
 
         // Extract upcoming service data - check for nested objects or flat structure
-        const upcomingServiceData = servicesData.upcoming_service ||
+        const upcomingServiceData = data.upcoming_service ||
+          servicesData.upcoming_service ||
           servicesData.upcomingService ||
           servicesData.upcoming ||
           servicesData;
 
+        // Extract service slip URL from last service data
+        // Check both the direct data object and lastServiceData
+        const serviceSlipUrlValue = data.last_service?.service_slip_url ||
+          lastServiceData?.service_slip_url ||
+          lastServiceData?.serviceSlipUrl ||
+          servicesData?.service_slip_url ||
+          servicesData?.serviceSlipUrl ||
+          null;
+
+        // Extract service ID and AMC flag - check multiple possible locations
+        const serviceIdValue = data.last_service?.id ||
+          lastServiceData?.id ||
+          lastServiceData?.service_id ||
+          servicesData?.id ||
+          servicesData?.service_id ||
+          null;
+
+        const isAmcServiceValue = data.last_service?.is_amc_service !== undefined ? data.last_service.is_amc_service :
+          lastServiceData?.is_amc_service !== undefined ? lastServiceData.is_amc_service :
+            servicesData?.is_amc_service !== undefined ? servicesData.is_amc_service :
+              true; // Default to true since service slips are only for AMC services
+
+        console.log('Service Slip URL:', serviceSlipUrlValue);
+        console.log('Service ID:', serviceIdValue);
+        console.log('Is AMC Service:', isAmcServiceValue);
+        console.log('Full last service data:', JSON.stringify(data.last_service || lastServiceData, null, 2));
+
+        // Store service slip URL, service ID, and AMC flag in state
+        setServiceSlipUrl(serviceSlipUrlValue);
+        if (serviceIdValue) {
+          setLastServiceId(serviceIdValue);
+        }
+        setIsAmcService(isAmcServiceValue);
+
         // Map API response to RoutineService interface with comprehensive field checking
         const routineService: RoutineService = {
           lastService: {
-            id: lastServiceData.id || lastServiceData.service_id || lastServiceData.serviceId || servicesData.id || servicesData.service_id || servicesData.serviceId,
             date: lastServiceData.last_service_date ||
               lastServiceData.lastServiceDate ||
               lastServiceData.service_date ||
@@ -312,9 +291,9 @@ const DashboardPage: React.FC = () => {
               servicesData.last_service_code ||
               servicesData.lastServiceCode ||
               'Nil',
+            service_slip_url: serviceSlipUrlValue,
           },
           upcomingService: {
-            id: upcomingServiceData.id || upcomingServiceData.service_id || upcomingServiceData.serviceId || servicesData.id || servicesData.service_id || servicesData.serviceId,
             date: upcomingServiceData.upcoming_service_date ||
               upcomingServiceData.upcomingServiceDate ||
               upcomingServiceData.service_date ||
@@ -363,62 +342,104 @@ const DashboardPage: React.FC = () => {
 
   const handleDownloadServiceSlip = async () => {
     try {
-      // Check if there's a last service with a valid date
-      const lastServiceDate = routineService?.lastService?.date;
-      const lastServiceId = routineService?.lastService?.id;
-
-      if (!lastServiceDate || lastServiceDate === 'N/A' || lastServiceDate.trim() === '') {
-        Alert.alert('No Completed Services', 'There are no completed routine services to download.');
-        return;
-      }
-
-      if (!lastServiceId || lastServiceId === 'N/A' || lastServiceId.trim() === '') {
-        Alert.alert('Error', 'Service ID not found. Cannot download service slip.');
-        return;
-      }
-
       const userEmail = user?.email;
       if (!userEmail) {
-        Alert.alert('Error', 'User information not found. Please login again.');
+        Alert.alert(
+          'Error',
+          'User email is required to download service slip.',
+          [{ text: 'OK' }]
+        );
         return;
       }
 
-      // Show loading indicator
-      setIsLoadingRoutine(true);
+      // Get service ID from stored state or extract from API response
+      let serviceId: string | number | null = lastServiceId;
 
-      // Make API call to download service slip for completed services only
-      const url = `${API_ENDPOINTS.ROUTINE_SERVICES_DOWNLOAD_SLIP}?email=${encodeURIComponent(userEmail)}&service_id=${encodeURIComponent(lastServiceId)}`;
-
-      console.log('Downloading service slip from:', url);
-
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/pdf',
-        },
-      });
-
-      if (response.ok) {
-        // For React Native, we'll show a success message
-        // In a real implementation, you might want to use a library like react-native-fs
-        // to save the file to the device
-        Alert.alert(
-          'Download Ready',
-          'Service slip is ready for download. In a mobile app, this would be saved to your device.',
-          [
-            { text: 'OK' }
-          ]
-        );
-      } else {
-        const errorText = await response.text();
-        console.error('Error downloading service slip:', errorText);
-        Alert.alert('Error', 'Failed to download service slip. Please try again.');
+      // If not in state, try to get from the last service data
+      if (!serviceId) {
+        const lastServiceData = routineService?.lastService;
+        // Try to extract from service_slip_url if available
+        const serviceSlipUrlValue = serviceSlipUrl || lastServiceData?.service_slip_url;
+        if (serviceSlipUrlValue) {
+          const urlMatch = serviceSlipUrlValue.match(/routine-service-certificate\/(\d+)/);
+          if (urlMatch && urlMatch[1]) {
+            serviceId = urlMatch[1];
+          }
+        }
       }
-    } catch (error) {
-      console.error('Error downloading service slip:', error);
-      Alert.alert('Error', 'An error occurred while downloading the service slip. Please try again.');
-    } finally {
-      setIsLoadingRoutine(false);
+
+      // If still no service ID, try to get from the API response data directly
+      if (!serviceId) {
+        // Try to reload the routine services to get the service ID
+        try {
+          const url = `${API_ENDPOINTS.ROUTINE_SERVICES}?email=${encodeURIComponent(userEmail)}`;
+          const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            const lastService = data.last_service || data.lastService;
+            if (lastService && lastService.id) {
+              serviceId = lastService.id;
+              setLastServiceId(lastService.id);
+              setIsAmcService(lastService.is_amc_service || false);
+            }
+          }
+        } catch (fetchError) {
+          console.error('Error fetching service ID:', fetchError);
+        }
+      }
+
+      if (!serviceId) {
+        Alert.alert(
+          'Service Information Not Available',
+          'Could not find service information. Please refresh the page and try again.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      console.log('Downloading service slip - Service ID:', serviceId, 'Email:', userEmail, 'Is AMC:', isAmcService);
+
+      // Call the API endpoint
+      const apiUrl = `${API_ENDPOINTS.DOWNLOAD_SERVICE_SLIP}?service_id=${serviceId}&email=${encodeURIComponent(userEmail)}&is_amc=${isAmcService || true}`;
+
+      console.log('API URL:', apiUrl);
+
+      // Show loading indicator
+      Alert.alert(
+        'Downloading',
+        'Please wait while we prepare your service slip...',
+        [{ text: 'OK' }]
+      );
+
+      // For web platform
+      if (Platform.OS === 'web') {
+        // Open in new tab for web
+        window.open(apiUrl, '_blank');
+        return;
+      }
+
+      // For mobile platforms, open in browser
+      Linking.openURL(apiUrl).catch(err => {
+        console.error('Error opening URL:', err);
+        Alert.alert(
+          'Error',
+          'Could not open the service slip. Please check your internet connection and try again.',
+          [{ text: 'OK' }]
+        );
+      });
+    } catch (error: any) {
+      console.error('Error in handleDownloadServiceSlip:', error);
+      Alert.alert(
+        'Error',
+        error.message || 'An error occurred while trying to download the service slip. Please try again.',
+        [{ text: 'OK' }]
+      );
     }
   };
 
@@ -483,9 +504,14 @@ const DashboardPage: React.FC = () => {
         onNavigateToAMCContracts={() => navigateTo('/amc-contracts')}
         onNavigateToInvoice={() => navigateTo('/invoice')}
         onNavigateToQuotation={() => navigateTo('/quotation')}
-        onNavigateToProfileSwitch={() => navigateTo('/profile-switch')}
+
         onNavigateToAboutUs={() => navigateTo('/about-us')}
-        onNavigateToCreateUser={() => navigateTo('/create-user')}
+        onNavigateToCreateUser={() => {
+          // Prevent sub-users from accessing Create User page
+          if (!user?.is_subcustomer) {
+            navigateTo('/create-user');
+          }
+        }}
       />
 
       {/* Blue Header */}
@@ -595,22 +621,25 @@ const DashboardPage: React.FC = () => {
             </View>
           )}
 
+          {/* Show sub-customer info if logged in as sub-customer */}
+          {user?.is_subcustomer && user?.subcustomer && (
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Sub-Customer :</Text>
+              <Text style={styles.infoValue}>
+                {user.subcustomer.name || user.subcustomer.email || 'N/A'}
+              </Text>
+            </View>
+          )}
+
           <View style={styles.sessionInfo}>
             <Text style={styles.sessionText}>
-              Current Session : {user?.site_name || 'N/A'} | {user?.phone || user?.mobile || 'N/A'} | {user?.email || 'N/A'}
+              {user?.is_subcustomer ? 'Sub-Customer Session' : 'Current Session'} : {user?.site_name || 'N/A'} | {user?.phone || user?.mobile || 'N/A'} | {user?.email || 'N/A'}
             </Text>
           </View>
         </View>
 
         {/* AMC Details Card */}
-        {isLoadingAMC ? (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>AMC DETAILS</Text>
-            <View style={styles.loadingContainer}>
-              <Text style={styles.loadingText}>Loading AMC details...</Text>
-            </View>
-          </View>
-        ) : amcSummary ? (
+        {!isLoadingAMC && amcSummary && (
           <View style={styles.card}>
             <Text style={styles.cardTitle}>AMC DETAILS</Text>
 
@@ -651,7 +680,7 @@ const DashboardPage: React.FC = () => {
               </View>
             </View>
 
-            {amcSummary.latestContract && amcSummary.latestContract.contractId !== 'N/A' && (
+            {amcSummary.latestContract && (
               <View style={styles.latestContractSection}>
                 <Text style={styles.latestContractTitle}>Latest Contract</Text>
                 <View style={styles.latestContractInfo}>
@@ -660,22 +689,18 @@ const DashboardPage: React.FC = () => {
                     {amcSummary.latestContract.contractId}
                   </Text>
                 </View>
-                {amcSummary.latestContract.status !== 'N/A' && (
-                  <View style={styles.latestContractInfo}>
-                    <Text style={styles.latestContractLabel}>Status:</Text>
-                    <Text style={styles.latestContractValue}>
-                      {amcSummary.latestContract.status}
-                    </Text>
-                  </View>
-                )}
-                {amcSummary.latestContract.period !== 'N/A' && (
-                  <View style={styles.latestContractInfo}>
-                    <Text style={styles.latestContractLabel}>Period:</Text>
-                    <Text style={styles.latestContractValue}>
-                      {amcSummary.latestContract.period}
-                    </Text>
-                  </View>
-                )}
+                <View style={styles.latestContractInfo}>
+                  <Text style={styles.latestContractLabel}>Status:</Text>
+                  <Text style={styles.latestContractValue}>
+                    {amcSummary.latestContract.status}
+                  </Text>
+                </View>
+                <View style={styles.latestContractInfo}>
+                  <Text style={styles.latestContractLabel}>Period:</Text>
+                  <Text style={styles.latestContractValue}>
+                    {amcSummary.latestContract.period}
+                  </Text>
+                </View>
               </View>
             )}
 
@@ -685,13 +710,6 @@ const DashboardPage: React.FC = () => {
             >
               <Text style={styles.viewAllButtonText}>View All AMC Contracts</Text>
             </TouchableOpacity>
-          </View>
-        ) : (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>AMC DETAILS</Text>
-            <View style={styles.loadingContainer}>
-              <Text style={styles.loadingText}>No AMC data available</Text>
-            </View>
           </View>
         )}
 
@@ -765,6 +783,7 @@ const DashboardPage: React.FC = () => {
                 <TouchableOpacity
                   style={styles.downloadButton}
                   onPress={handleDownloadServiceSlip}
+                  activeOpacity={0.7}
                 >
                   <Text style={styles.downloadIcon}>⬇</Text>
                   <Text style={styles.downloadText}>Download Service Slip</Text>
@@ -969,7 +988,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 15,
-    paddingVertical: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    backgroundColor: '#F5F5F5',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#8B5CF6',
   },
   downloadIcon: {
     fontSize: 18,
@@ -981,6 +1005,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#8B5CF6',
     fontWeight: '500',
+  },
+  downloadButtonDisabled: {
+    opacity: 0.5,
+  },
+  downloadIconDisabled: {
+    opacity: 0.5,
+  },
+  downloadTextDisabled: {
+    color: '#999999',
   },
   amcSummaryRow: {
     flexDirection: 'row',
