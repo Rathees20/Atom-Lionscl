@@ -228,16 +228,6 @@ const AMCContractsPage: React.FC = () => {
           <View style={styles.headerRight} />
         </View>
 
-        {/* Client Information */}
-        {user?.reference_id && (
-          <View style={styles.clientInfoCard}>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Reference ID:</Text>
-              <Text style={styles.infoValue}>{user.reference_id}</Text>
-            </View>
-          </View>
-        )}
-
         {/* Loading State */}
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>Loading contract details...</Text>
@@ -265,16 +255,6 @@ const AMCContractsPage: React.FC = () => {
 
           <View style={styles.headerRight} />
         </View>
-
-        {/* Client Information */}
-        {user?.reference_id && (
-          <View style={styles.clientInfoCard}>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Reference ID:</Text>
-              <Text style={styles.infoValue}>{user.reference_id}</Text>
-            </View>
-          </View>
-        )}
 
         {/* Empty State */}
         <View style={styles.emptyContainer}>
@@ -306,15 +286,6 @@ const AMCContractsPage: React.FC = () => {
 
       {/* Main Content */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Client Information */}
-        {user?.reference_id && (
-          <View style={styles.clientInfoCard}>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Reference ID:</Text>
-              <Text style={styles.infoValue}>{user.reference_id}</Text>
-            </View>
-          </View>
-        )}
 
         {contracts.map((contract) => (
           <View key={contract.id}>
@@ -528,36 +499,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 10,
   },
-  clientInfoCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    padding: 20,
-    margin: 20,
-    marginBottom: 0,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    marginBottom: 8,
-  },
-  infoLabel: {
-    fontSize: 14,
-    color: '#000000',
-    fontWeight: '500',
-    width: 120,
-  },
-  infoValue: {
-    fontSize: 14,
-    color: '#000000',
-    flex: 1,
-  },
+
 });
 
 export default AMCContractsPage;

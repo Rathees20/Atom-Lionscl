@@ -406,7 +406,7 @@ const DashboardPage: React.FC = () => {
       console.log('Downloading service slip - Service ID:', serviceId, 'Email:', userEmail, 'Is AMC:', isAmcService);
 
       // Call the API endpoint
-      const apiUrl = `${API_ENDPOINTS.DOWNLOAD_SERVICE_SLIP}?service_id=${serviceId}&email=${encodeURIComponent(userEmail)}&is_amc=${isAmcService || true}`;
+      const apiUrl = `${API_ENDPOINTS.ROUTINE_SERVICES_DOWNLOAD_SLIP}?service_id=${serviceId}&email=${encodeURIComponent(userEmail)}&is_amc=${isAmcService || true}`;
 
       console.log('API URL:', apiUrl);
 
