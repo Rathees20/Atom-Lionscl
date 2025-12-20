@@ -60,6 +60,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
     quotation: require('../assets/Quatation.png'),
     invoice: require('../assets/invoice.png'),
     aboutUs: require('../assets/About us.png'),
+    createUser: require('../assets/user.png'),
 
     logout: require('../assets/logout.png'),
   };
@@ -147,7 +148,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
     {
       id: 'create-user',
       title: 'Create User',
-      icon: menuIcons.switchProfile, // Using switch profile icon as placeholder
+      icon: menuIcons.createUser,
       onPress: () => {
         onClose();
         if (onNavigateToCreateUser) {
@@ -185,10 +186,10 @@ const SideMenu: React.FC<SideMenuProps> = ({
   const phoneNumber = userData?.mobile || userData?.phone || userData?.mobileNumber || '';
 
   // Filter out Create User menu item for sub-users
-  const filteredMenuItems = userData?.is_subcustomer 
+  const filteredMenuItems = userData?.is_subcustomer
     ? menuItems.filter(item => item.id !== 'create-user')
     : menuItems;
-  
+
   return (
     <Modal
       visible={visible}
@@ -205,13 +206,13 @@ const SideMenu: React.FC<SideMenuProps> = ({
               <View style={styles.patternShape2} />
               <View style={styles.patternShape3} />
             </View>
-              
+
             <View style={styles.userInfo}>
               <View style={styles.userItem}>
                 <Text style={styles.userIcon}>👤</Text>
                 <Text style={styles.userText}>{siteName}</Text>
               </View>
-                
+
               {phoneNumber && (
                 <View style={styles.userItem}>
                   <Image source={telephoneIcon} style={styles.userIconImage} resizeMode="contain" />
@@ -222,7 +223,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
               )}
             </View>
           </View>
-  
+
           {/* Menu Items */}
           <ScrollView style={styles.menuContent} showsVerticalScrollIndicator={false}>
             {filteredMenuItems.map((item, index) => (

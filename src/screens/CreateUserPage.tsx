@@ -37,7 +37,7 @@ const CreateUserPage: React.FC = () => {
     type: 'info', // 'success', 'error', 'warning', 'info'
   });
 
-  const handleInputChange = (field: string, value: string) => {
+  const handleInputChange = (field: string, value: string | boolean) => {
     setFormData(prev => ({
       ...prev,
       [field]: value,
@@ -216,6 +216,14 @@ const CreateUserPage: React.FC = () => {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          {/* User Icon */}
+          <View style={styles.userIconContainer}>
+            <Image
+              source={require('../assets/user.png')}
+              style={styles.userIcon}
+              resizeMode="contain"
+            />
+          </View>
           {/* Name */}
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>Full Name *</Text>
@@ -393,6 +401,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666666',
     lineHeight: 16,
+  },
+  userIconContainer: {
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  userIcon: {
+    width: 80,
+    height: 80,
+    tintColor: '#FF6B6B',
   },
 });
 

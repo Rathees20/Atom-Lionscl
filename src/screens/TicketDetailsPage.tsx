@@ -890,7 +890,7 @@ const TicketDetailsPage: React.FC = () => {
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Priority:</Text>
               <Text style={[styles.infoValue, { color: '#F44336', fontWeight: 'bold' }]}>
-                {ticketDetails.priority.charAt(0).toUpperCase() + ticketDetails.priority.slice(1)}
+                {ticketDetails.priority ? ticketDetails.priority.charAt(0).toUpperCase() + ticketDetails.priority.slice(1) : 'Not specified'}
               </Text>
             </View>
 

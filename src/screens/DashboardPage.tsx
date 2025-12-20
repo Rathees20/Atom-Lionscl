@@ -88,6 +88,8 @@ const DashboardPage: React.FC = () => {
       if (response.ok) {
         const amcs = Array.isArray(data) ? data : (data.amcs || data.contracts || data.results || []);
 
+        console.log('AMC Data received:', amcs);
+
         const summary: AMCSummary = {
           totalContracts: amcs.length,
           activeContracts: amcs.filter((item: any) =>
@@ -103,12 +105,24 @@ const DashboardPage: React.FC = () => {
             sum + (parseFloat(item.due_amount || item.dueAmount || '0') || 0), 0
           ),
           latestContract: amcs.length > 0 ? {
-            contractId: amcs[0].contract_id || amcs[0].contractId || amcs[0].amc_id?.toString() || 'N/A',
-            status: amcs[0].status || 'N/A',
-            period: amcs[0].period || amcs[0].contract_period ||
-              (amcs[0].start_date && amcs[0].end_date ? `${amcs[0].start_date} - ${amcs[0].end_date}` : 'N/A'),
+            contractId: amcs[0].contract_id ||
+              amcs[0].contractId ||
+              amcs[0].amc_id?.toString() ||
+              amcs[0].amcId?.toString() ||
+              amcs[0].id?.toString() ||
+              amcs[0].contract_number ||
+              amcs[0].contractNumber ||
+              'N/A',
+            status: amcs[0].status || amcs[0].Status || 'N/A',
+            period: amcs[0].period ||
+              amcs[0].contract_period ||
+              amcs[0].contractPeriod ||
+              (amcs[0].start_date && amcs[0].end_date ? `${amcs[0].start_date} - ${amcs[0].end_date}` :
+                amcs[0].startDate && amcs[0].endDate ? `${amcs[0].startDate} - ${amcs[0].endDate}` : 'N/A'),
           } : undefined,
         };
+
+        console.log('AMC Summary created:', summary);
 
         setAmcSummary(summary);
       }
@@ -175,6 +189,8 @@ const DashboardPage: React.FC = () => {
         return;
       }
 
+      console.log('Loading routine services for user:', userEmail);
+
       const url = `${API_ENDPOINTS.ROUTINE_SERVICES}?email=${encodeURIComponent(userEmail)}`;
       console.log('Fetching routine services from:', url);
 
@@ -230,18 +246,30 @@ const DashboardPage: React.FC = () => {
           servicesData?.serviceSlipUrl ||
           null;
 
+        console.log('Checking for service slip URL in various locations:');
+        console.log('- data.last_service?.service_slip_url:', data.last_service?.service_slip_url);
+        console.log('- lastServiceData?.service_slip_url:', lastServiceData?.service_slip_url);
+        console.log('- lastServiceData?.serviceSlipUrl:', lastServiceData?.serviceSlipUrl);
+        console.log('- servicesData?.service_slip_url:', servicesData?.service_slip_url);
+        console.log('- servicesData?.serviceSlipUrl:', servicesData?.serviceSlipUrl);
+
         // Extract service ID and AMC flag - check multiple possible locations
         const serviceIdValue = data.last_service?.id ||
           lastServiceData?.id ||
           lastServiceData?.service_id ||
+          lastServiceData?.serviceId ||
           servicesData?.id ||
           servicesData?.service_id ||
+          servicesData?.serviceId ||
           null;
 
         const isAmcServiceValue = data.last_service?.is_amc_service !== undefined ? data.last_service.is_amc_service :
-          lastServiceData?.is_amc_service !== undefined ? lastServiceData.is_amc_service :
-            servicesData?.is_amc_service !== undefined ? servicesData.is_amc_service :
-              true; // Default to true since service slips are only for AMC services
+          data.last_service?.isAmcService !== undefined ? data.last_service.isAmcService :
+            lastServiceData?.is_amc_service !== undefined ? lastServiceData.is_amc_service :
+              lastServiceData?.isAmcService !== undefined ? lastServiceData.isAmcService :
+                servicesData?.is_amc_service !== undefined ? servicesData.is_amc_service :
+                  servicesData?.isAmcService !== undefined ? servicesData.isAmcService :
+                    true; // Default to true since service slips are only for AMC services
 
         console.log('Service Slip URL:', serviceSlipUrlValue);
         console.log('Service ID:', serviceIdValue);
@@ -331,6 +359,7 @@ const DashboardPage: React.FC = () => {
         };
 
         console.log('Mapped routine service:', JSON.stringify(routineService, null, 2));
+        console.log('Service slip URL in routineService:', routineService?.lastService?.service_slip_url);
         setRoutineService(routineService);
       }
     } catch (error) {
@@ -361,18 +390,34 @@ const DashboardPage: React.FC = () => {
         // Try to extract from service_slip_url if available
         const serviceSlipUrlValue = serviceSlipUrl || lastServiceData?.service_slip_url;
         if (serviceSlipUrlValue) {
-          const urlMatch = serviceSlipUrlValue.match(/routine-service-certificate\/(\d+)/);
-          if (urlMatch && urlMatch[1]) {
-            serviceId = urlMatch[1];
+          console.log('Attempting to extract service ID from URL:', serviceSlipUrlValue);
+          // Try multiple patterns to extract service ID from URL
+          const patterns = [
+            /routine-service-certificate\/(\d+)/,
+            /download-service-slip\?service_id=(\d+)/,
+            /[?&]service_id=(\d+)/,
+            /service-slip\/(\d+)/,
+            /(\d+)\/download/
+          ];
+
+          for (const pattern of patterns) {
+            const urlMatch = serviceSlipUrlValue.match(pattern);
+            if (urlMatch && urlMatch[1]) {
+              serviceId = urlMatch[1];
+              console.log('Extracted service ID using pattern:', pattern, 'ID:', serviceId);
+              break;
+            }
           }
         }
       }
 
       // If still no service ID, try to get from the API response data directly
       if (!serviceId) {
+        console.log('Service ID not found, attempting to reload routine services');
         // Try to reload the routine services to get the service ID
         try {
           const url = `${API_ENDPOINTS.ROUTINE_SERVICES}?email=${encodeURIComponent(userEmail)}`;
+          console.log('Fetching routine services from:', url);
           const response = await fetch(url, {
             method: 'GET',
             headers: {
@@ -382,12 +427,18 @@ const DashboardPage: React.FC = () => {
 
           if (response.ok) {
             const data = await response.json();
-            const lastService = data.last_service || data.lastService;
-            if (lastService && lastService.id) {
-              serviceId = lastService.id;
-              setLastServiceId(lastService.id);
-              setIsAmcService(lastService.is_amc_service || false);
+            console.log('Routine services response:', data);
+            const lastService = data.last_service || data.lastService || data.last_service_data || data.lastServiceData;
+            console.log('Extracted last service data:', lastService);
+            if (lastService && (lastService.id || lastService.service_id || lastService.serviceId)) {
+              serviceId = lastService.id || lastService.service_id || lastService.serviceId;
+              console.log('Found service ID in API response:', serviceId);
+              setLastServiceId(serviceId);
+              setIsAmcService(lastService.is_amc_service !== undefined ? lastService.is_amc_service :
+                lastService.isAmcService !== undefined ? lastService.isAmcService : true);
             }
+          } else {
+            console.log('Failed to fetch routine services, status:', response.status);
           }
         } catch (fetchError) {
           console.error('Error fetching service ID:', fetchError);
@@ -406,9 +457,24 @@ const DashboardPage: React.FC = () => {
       console.log('Downloading service slip - Service ID:', serviceId, 'Email:', userEmail, 'Is AMC:', isAmcService);
 
       // Call the API endpoint
-      const apiUrl = `${API_ENDPOINTS.ROUTINE_SERVICES_DOWNLOAD_SLIP}?service_id=${serviceId}&email=${encodeURIComponent(userEmail)}&is_amc=${isAmcService || true}`;
+      // Make sure serviceId is properly formatted as string
+      const serviceIdStr = typeof serviceId === 'number' ? serviceId.toString() : serviceId;
+      const apiUrl = `${API_ENDPOINTS.ROUTINE_SERVICES_DOWNLOAD_SLIP}?service_id=${encodeURIComponent(serviceIdStr)}&email=${encodeURIComponent(userEmail)}&is_amc=${isAmcService ? 'true' : 'false'}`;
 
       console.log('API URL:', apiUrl);
+
+      // Validate the URL
+      try {
+        new URL(apiUrl);
+      } catch (urlError) {
+        console.error('Invalid API URL constructed:', apiUrl, urlError);
+        Alert.alert(
+          'Error',
+          'Could not construct valid download URL. Please try again.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
 
       // Show loading indicator
       Alert.alert(
@@ -419,20 +485,33 @@ const DashboardPage: React.FC = () => {
 
       // For web platform
       if (Platform.OS === 'web') {
-        // Open in new tab for web
-        window.open(apiUrl, '_blank');
+        try {
+          // Open in new tab for web
+          console.log('Opening URL in new tab:', apiUrl);
+          window.open(apiUrl, '_blank');
+        } catch (webError) {
+          console.error('Error opening URL in web:', webError);
+          Alert.alert(
+            'Error',
+            'Could not open the service slip in browser. Please try again.',
+            [{ text: 'OK' }]
+          );
+        }
         return;
       }
 
       // For mobile platforms, open in browser
-      Linking.openURL(apiUrl).catch(err => {
-        console.error('Error opening URL:', err);
+      try {
+        console.log('Opening URL with Linking:', apiUrl);
+        await Linking.openURL(apiUrl);
+      } catch (linkingError) {
+        console.error('Error opening URL with Linking:', linkingError);
         Alert.alert(
           'Error',
           'Could not open the service slip. Please check your internet connection and try again.',
           [{ text: 'OK' }]
         );
-      });
+      };
     } catch (error: any) {
       console.error('Error in handleDownloadServiceSlip:', error);
       Alert.alert(
